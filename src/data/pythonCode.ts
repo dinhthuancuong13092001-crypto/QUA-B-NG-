@@ -12,7 +12,7 @@ export interface PythonFile {
 export const pythonCodebase: PythonFile[] = [
   {
     name: "models.py",
-    description: "Chứa các lớp cấu trúc dữ liệu cho Đội bóng, Trận đấu và Bảng xếp hạng.",
+    description: "Chứa các lớp cấu trúc dữ liệu cho Đội bóng, Trận đấu, Bảng xếp hạng và Giải đấu.",
     content: `import uuid
 from dataclasses import dataclass, field
 from typing import List, Optional
@@ -59,6 +59,17 @@ class TeamStanding:
     red_cards: int = 0
     discipline_points: int = 0  # Điểm phạt kỷ luật: 1 thẻ đỏ = 3đ, 1 thẻ vàng = 1đ
     points: int = 0           # Điểm số chuẩn FIFA: Thắng = 3đ, Hòa = 1đ, Thua = 0đ
+
+@dataclass
+class Tournament:
+    id: str
+    name: str
+    type: str                 # "ROUND_ROBIN" hoặc "KNOCK_OUT"
+    num_groups: int = 1
+    group_type: str = "single"  # "single" hoặc "multiple"
+    teams: List[Team] = field(default_factory=list)
+    matches: List[Match] = field(default_factory=list)
+    created_at: str = ""
 `
   },
   {
@@ -399,12 +410,14 @@ def export_to_excel(filepath: str, teams: List[Team], matches: List[Match], stan
             vs_str, score_away, away_name, time_str, ref_str, card_home_str, card_away_str
         ]
         
-        for col_idx, val in enumerate(vals, 1):
-            c = ws2.cell(row=row_ptr, column=col_idx, value=val)
+        for col_idx, v in enumerate(vals, 1):
+            c = ws2.cell(row=row_ptr, column=col_idx, value=v)
             c.font = data_font
             c.border = thin_border
             if col_idx in (1, 2, 4, 5, 6, 8, 10, 11):
                 c.alignment = align_center
+            elif col_idx in (3, 9):
+                c.alignment = align_right
             else:
                 c.alignment = align_left
         row_ptr += 1
@@ -412,123 +425,393 @@ def export_to_excel(filepath: str, teams: List[Team], matches: List[Match], stan
     auto_fit_columns(ws2)
     
     # ==================== SHEET 3: BẢNG XẾP HẠNG ====================
-    ws3 = wb.create_sheet("Bảng xếp hạng tổng hợp")
+    ws3 = wb.create_sheet("Bảng xếp hạng")
     ws3.views.sheetView[0].showGridLines = True
     
-    ws3.cell(row=1, column=1, value="BẢNG XẾP HẠNG TOÀN GIẢI").font = title_font
+    ws3.cell(row=1, column=1, value="BẢNG XẾP HẠNG TOÀN GIẢI ĐẤU (FIFA STANDINGS)").font = title_font
     ws3.row_dimensions[1].height = 30
     
-    groups_list = sorted(list(set([t.group for t in teams if t.group])))
+    headers3 = ["Hạng", "Đội bóng", "Số trận", "Thắng", "Hòa", "Thua", "Bàn thắng (BT)", "Bàn thua (BP)", "Hiệu số (HS)", "Thẻ phạt (V/Đ)", "Điểm kỷ luật", "Điểm số"]
+    ws3.row_dimensions[3].height = 25
     
-    row_ptr = 3
-    if groups_list:
-        # Nếu có chia bảng đấu
-        for g_name in groups_list:
-            ws3.cell(row=row_ptr, column=1, value=f"BẢNG XẾP HẠNG BẢNG {g_name}").font = Font(name="Segoe UI", size=12, bold=True, color="1B365D")
-            ws3.row_dimensions[row_ptr].height = 25
-            row_ptr += 1
-            
-            headers3 = ["Hạng", "Đội bóng", "Trận", "Thắng", "Hòa", "Thua", "BT", "BP", "HS", "Thẻ phạt", "Điểm phạt", "Điểm số"]
-            ws3.row_dimensions[row_ptr].height = 25
-            for col_idx, h in enumerate(headers3, 1):
-                cell = ws3.cell(row=row_ptr, column=col_idx, value=h)
-                cell.font = header_font
-                cell.fill = header_fill
-                cell.alignment = align_center
-                cell.border = thin_border
-            row_ptr += 1
-            
-            g_standings = standings_func(teams, matches, g_name)
-            for idx, std in enumerate(g_standings, 1):
-                ws3.row_dimensions[row_ptr].height = 20
-                vals = [
-                    idx, std.team_name, std.played, std.won, std.drawn, std.lost,
-                    std.goals_for, std.goals_against, std.goal_difference,
-                    f"V:{std.yellow_cards} | Đ:{std.red_cards}", std.discipline_points, std.points
-                ]
-                for col_idx, val in enumerate(vals, 1):
-                    c = ws3.cell(row=row_ptr, column=col_idx, value=val)
-                    c.border = thin_border
-                    if col_idx == 12:
-                        c.font = bold_font
-                    else:
-                        c.font = data_font
-                        
-                    if col_idx in (1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
-                        c.alignment = align_center
-                    else:
-                        c.alignment = align_left
-                row_ptr += 1
-            row_ptr += 2  # Tạo khoảng cách giữa các bảng
-    else:
-        # Không chia bảng
-        headers3 = ["Hạng", "Đội bóng", "Trận", "Thắng", "Hòa", "Thua", "BT", "BP", "HS", "Thẻ phạt", "Điểm phạt", "Điểm số"]
-        ws3.row_dimensions[row_ptr].height = 25
-        for col_idx, h in enumerate(headers3, 1):
-            cell = ws3.cell(row=row_ptr, column=col_idx, value=h)
-            cell.font = header_font
-            cell.fill = header_fill
-            cell.alignment = align_center
-            cell.border = thin_border
+    for col_idx, h in enumerate(headers3, 1):
+        cell = ws3.cell(row=3, column=col_idx, value=h)
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = align_center
+        cell.border = thin_border
+        
+    row_ptr = 4
+    try:
+        standings_data = standings_func(teams, matches)
+    except Exception:
+        standings_data = []
+        
+    for idx, std in enumerate(standings_data, 1):
+        ws3.row_dimensions[row_ptr].height = 20
+        cards_str = f"V:{std.yellow_cards} | Đ:{std.red_cards}"
+        
+        vals = [
+            idx, std.team_name, std.played, std.won, std.drawn, std.lost,
+            std.goals_for, std.goals_against, std.goal_difference, cards_str, std.discipline_points, std.points
+        ]
+        
+        for col_idx, v in enumerate(vals, 1):
+            c = ws3.cell(row=row_ptr, column=col_idx, value=v)
+            c.border = thin_border
+            if col_idx == 12:
+                c.font = bold_font
+            else:
+                c.font = data_font
+                
+            if col_idx == 2:
+                c.alignment = align_left
+            else:
+                c.alignment = align_center
         row_ptr += 1
         
-        all_standings = standings_func(teams, matches, None)
-        for idx, std in enumerate(all_standings, 1):
-            ws3.row_dimensions[row_ptr].height = 20
-            vals = [
-                idx, std.team_name, std.played, std.won, std.drawn, std.lost,
-                std.goals_for, std.goals_against, std.goal_difference,
-                f"V:{std.yellow_cards} | Đ:{std.red_cards}", std.discipline_points, std.points
-            ]
-            for col_idx, val in enumerate(vals, 1):
-                c = ws3.cell(row=row_ptr, column=col_idx, value=val)
-                c.border = thin_border
-                if col_idx == 12:
-                    c.font = bold_font
-                else:
-                    c.font = data_font
-                    
-                if col_idx in (1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12):
-                    c.alignment = align_center
-                else:
-                    c.alignment = align_left
-            row_ptr += 1
-            
     auto_fit_columns(ws3)
     
-    wb.save(filepath)
-    return True
+    # Lưu file
+    try:
+        wb.save(filepath)
+        return True
+    except Exception as e:
+        print(f"Lỗi khi lưu file Excel: {str(e)}")
+        return False
 
 def auto_fit_columns(ws):
-    """Căn chỉnh động độ rộng của cột dựa trên nội dung."""
+    """Tự động điều chỉnh kích thước cột vừa khít với dữ liệu trong Sheet."""
     for col in ws.columns:
         max_len = 0
         col_letter = get_column_letter(col[0].column)
+        
+        # Bỏ qua dòng tiêu đề 1 đầu tiên để tính kích thước chuẩn xác hơn
         for cell in col:
-            if cell.value:
-                val_str = str(cell.value)
-                # Tính độ dài thô sơ, hỗ trợ hiển thị tiếng Việt có dấu
-                val_len = len(val_str.encode('utf-8')) // 2 + 3
-                if val_len > max_len:
-                    max_len = val_len
-        ws.column_dimensions[col_letter].width = max(max_len, 10)
+            if cell.row == 1:
+                continue
+            val = str(cell.value or '')
+            if len(val) > max_len:
+                max_len = len(val)
+                
+        # Thêm một chút padding khoảng cách
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
 `
   },
   {
     name: "views.py",
-    description: "Chứa các Widget giao diện tab PyQt6 kế thừa từ QWidget và QTableWidget.",
+    description: "Chứa giao diện chính, bao gồm bảng điều khiển đội bóng, bốc thăm xếp lịch đấu, cập nhật kết quả và bảng xếp hạng trực quan.",
     content: `import sys
 import random
 import uuid
+import datetime
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, 
     QSpinBox, QInputDialog, QMessageBox, QDialog, QFormLayout, 
-    QLineEdit, QDateTimeEdit, QSplitter, QGroupBox, QListWidget
+    QLineEdit, QDateTimeEdit, QSplitter, QGroupBox, QListWidget, QCheckBox, QTabWidget
 )
 from PyQt6.QtCore import Qt, QDateTime
-from models import Team, Match, TeamStanding
+from models import Team, Match, TeamStanding, Tournament
 from scheduler import generate_round_robin, generate_knockout, get_team_display_name
+
+class TournamentManagerDialog(QDialog):
+    """Cửa sổ quản lý danh sách các giải đấu (Thêm, Xóa, Đổi tên, Sao lưu)"""
+    def __init__(self, main_window, parent=None):
+        super().__init__(parent)
+        self.main_window = main_window
+        self.setWindowTitle("Quản lý Danh sách Giải đấu")
+        self.resize(750, 480)
+        self.init_ui()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout()
+        
+        self.tabs = QTabWidget()
+        
+        # --- Tab 1: Danh sách giải ---
+        tab_list = QWidget()
+        list_layout = QHBoxLayout(tab_list)
+        
+        self.list_widget = QListWidget()
+        self.list_widget.currentRowChanged.connect(self.on_selection_changed)
+        list_layout.addWidget(self.list_widget, 2)
+        
+        details_panel = QVBoxLayout()
+        self.lbl_details_title = QLabel("<b>Thông tin giải đấu</b>")
+        self.lbl_details_title.setStyleSheet("font-size: 14px; color: #1B365D;")
+        details_panel.addWidget(self.lbl_details_title)
+        
+        self.lbl_details_type = QLabel("Thể thức: Vòng tròn")
+        details_panel.addWidget(self.lbl_details_type)
+        
+        self.lbl_details_teams = QLabel("Số đội bóng: 8 đội")
+        details_panel.addWidget(self.lbl_details_teams)
+        
+        self.lbl_details_matches = QLabel("Số trận đấu: 0 trận")
+        details_panel.addWidget(self.lbl_details_matches)
+        
+        self.lbl_details_created = QLabel("Ngày tạo: -")
+        details_panel.addWidget(self.lbl_details_created)
+        
+        details_panel.addStretch()
+        
+        # Buttons
+        self.btn_select = QPushButton("Chọn làm giải hiện tại 🎯")
+        self.btn_select.setStyleSheet("font-weight: bold; background-color: #1B365D; color: white; padding: 6px;")
+        self.btn_select.clicked.connect(self.select_tournament)
+        details_panel.addWidget(self.btn_select)
+        
+        self.btn_rename = QPushButton("Đổi tên giải đấu ✏️")
+        self.btn_rename.clicked.connect(self.rename_tournament)
+        details_panel.addWidget(self.btn_rename)
+        
+        self.btn_delete = QPushButton("Xóa giải đấu ❌")
+        self.btn_delete.setStyleSheet("color: red;")
+        self.btn_delete.clicked.connect(self.delete_tournament)
+        details_panel.addWidget(self.btn_delete)
+        
+        list_layout.addLayout(details_panel, 3)
+        self.tabs.addTab(tab_list, "Danh sách Giải đấu")
+        
+        # --- Tab 2: Tạo giải mới ---
+        tab_new = QWidget()
+        new_layout = QFormLayout(tab_new)
+        
+        self.txt_new_name = QLineEdit()
+        self.txt_new_name.setPlaceholderText("Nhập tên giải đấu mới...")
+        new_layout.addRow("Tên giải đấu:", self.txt_new_name)
+        
+        self.combo_new_type = QComboBox()
+        self.combo_new_type.addItems(["Đấu vòng tròn (Round-robin)", "Đấu loại trực tiếp (Knock-out)"])
+        self.combo_new_type.currentIndexChanged.connect(self.on_new_type_changed)
+        new_layout.addRow("Thể thức thi đấu:", self.combo_new_type)
+        
+        self.combo_new_group_type = QComboBox()
+        self.combo_new_group_type.addItems(["1 Bảng duy nhất", "N Bảng đấu"])
+        self.combo_new_group_type.currentIndexChanged.connect(self.on_new_group_type_changed)
+        new_layout.addRow("Phân chia bảng:", self.combo_new_group_type)
+        
+        self.spin_new_groups = QSpinBox()
+        self.spin_new_groups.setRange(2, 8)
+        self.spin_new_groups.setValue(2)
+        self.spin_new_groups.setEnabled(False)
+        new_layout.addRow("Số lượng bảng:", self.spin_new_groups)
+        
+        self.chk_with_samples = QCheckBox("Khởi tạo sẵn 8 đội bóng mẫu")
+        self.chk_with_samples.setChecked(True)
+        new_layout.addRow("", self.chk_with_samples)
+        
+        btn_create = QPushButton("Tạo giải đấu ⚽")
+        btn_create.setStyleSheet("font-weight: bold; background-color: #198754; color: white; padding: 6px;")
+        btn_create.clicked.connect(self.create_tournament)
+        new_layout.addRow("", btn_create)
+        
+        self.tabs.addTab(tab_new, "Tạo Giải đấu Mới")
+        
+        # --- Tab 3: Sao lưu / Khôi phục ---
+        tab_backup = QWidget()
+        backup_layout = QVBoxLayout(tab_backup)
+        
+        self.chk_auto_save = QCheckBox("Tự động sao lưu dữ liệu ra file 'football_tournaments_backup.json' khi thay đổi")
+        self.chk_auto_save.setChecked(self.main_window.is_auto_save_enabled)
+        self.chk_auto_save.toggled.connect(self.on_auto_save_toggled)
+        backup_layout.addWidget(self.chk_auto_save)
+        
+        lbl_desc = QLabel(
+            "Bạn có thể xuất toàn bộ danh sách các giải đấu hiện tại ra một file JSON\\n"
+            "để lưu trữ dự phòng, hoặc nhập một file sao lưu JSON đã lưu từ trước."
+        )
+        lbl_desc.setStyleSheet("color: #6c757d; line-height: 1.4; margin-top: 10px; margin-bottom: 10px;")
+        backup_layout.addWidget(lbl_desc)
+        
+        btn_export_json = QPushButton("Xuất toàn bộ Giải đấu ra file JSON 📤")
+        btn_export_json.clicked.connect(self.export_json)
+        backup_layout.addWidget(btn_export_json)
+        
+        btn_import_json = QPushButton("Khôi phục Giải đấu từ file JSON 📥")
+        btn_import_json.clicked.connect(self.import_json)
+        backup_layout.addWidget(btn_import_json)
+        
+        backup_layout.addStretch()
+        self.tabs.addTab(tab_backup, "Sao lưu & Khôi phục")
+        
+        main_layout.addWidget(self.tabs)
+        self.setLayout(main_layout)
+        
+        self.refresh_list()
+
+    def refresh_list(self):
+        self.list_widget.clear()
+        for t in self.main_window.tournaments:
+            active_suffix = " (Đang chọn)" if t.id == self.main_window.active_tournament_id else ""
+            self.list_widget.addItem(f"{t.name}{active_suffix}")
+            
+        # Select active tournament row
+        for idx, t in enumerate(self.main_window.tournaments):
+            if t.id == self.main_window.active_tournament_id:
+                self.list_widget.setCurrentRow(idx)
+                break
+
+    def on_selection_changed(self, idx):
+        if idx < 0 or idx >= len(self.main_window.tournaments):
+            return
+        t = self.main_window.tournaments[idx]
+        self.lbl_details_title.setText(f"<b>{t.name}</b>")
+        type_str = "Đấu vòng tròn (Round-robin)" if t.type == "ROUND_ROBIN" else "Đấu loại trực tiếp (Knock-out)"
+        self.lbl_details_type.setText(f"Thể thức: {type_str}")
+        self.lbl_details_teams.setText(f"Số đội bóng: {len([team for team in t.teams if team.id != 'BYE'])} đội")
+        self.lbl_details_matches.setText(f"Số trận đấu: {len(t.matches)} trận")
+        self.lbl_details_created.setText(f"Ngày tạo: {t.created_at[:10] if t.created_at else '-'}")
+
+    def on_new_type_changed(self, idx):
+        is_rr = idx == 0
+        self.combo_new_group_type.setEnabled(is_rr)
+        if not is_rr:
+            self.combo_new_group_type.setCurrentIndex(0)
+            self.spin_new_groups.setEnabled(False)
+
+    def on_new_group_type_changed(self, idx):
+        self.spin_new_groups.setEnabled(idx == 1)
+
+    def select_tournament(self):
+        idx = self.list_widget.currentRow()
+        if idx < 0:
+            return
+        t = self.main_window.tournaments[idx]
+        self.main_window.active_tournament_id = t.id
+        self.main_window.update_tournament_combobox()
+        self.main_window.refresh_all_tabs()
+        self.refresh_list()
+        QMessageBox.information(self, "Thông báo", f"Đã chuyển sang giải đấu: {t.name}")
+
+    def rename_tournament(self):
+        idx = self.list_widget.currentRow()
+        if idx < 0:
+            return
+        t = self.main_window.tournaments[idx]
+        new_name, ok = QInputDialog.getText(self, "Đổi tên giải đấu", "Nhập tên mới:", text=t.name)
+        if ok and new_name.strip():
+            t.name = new_name.strip()
+            self.main_window.update_tournament_combobox()
+            self.main_window.save_state()
+            self.refresh_list()
+
+    def delete_tournament(self):
+        if len(self.main_window.tournaments) <= 1:
+            QMessageBox.warning(self, "Lỗi", "Không thể xóa giải đấu duy nhất còn lại!")
+            return
+            
+        idx = self.list_widget.currentRow()
+        if idx < 0:
+            return
+        t = self.main_window.tournaments[idx]
+        
+        reply = QMessageBox.question(
+            self, "Xác nhận", f"Bạn có chắc chắn muốn xóa giải đấu '{t.name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            self.main_window.tournaments = [tour for tour in self.main_window.tournaments if tour.id != t.id]
+            if self.main_window.active_tournament_id == t.id:
+                self.main_window.active_tournament_id = self.main_window.tournaments[0].id
+                
+            self.main_window.update_tournament_combobox()
+            self.main_window.save_state()
+            self.main_window.refresh_all_tabs()
+            self.refresh_list()
+
+    def create_tournament(self):
+        name = self.txt_new_name.text().strip()
+        if not name:
+            QMessageBox.warning(self, "Lỗi", "Vui lòng nhập tên giải đấu!")
+            return
+            
+        t_id = f"TOURNAMENT-{uuid.uuid4().hex[:6].upper()}"
+        is_rr = self.combo_new_type.currentIndex() == 0
+        
+        t_type = "ROUND_ROBIN" if is_rr else "KNOCK_OUT"
+        g_type = "multiple" if (is_rr and self.combo_new_group_type.currentIndex() == 1) else "single"
+        num_g = self.spin_new_groups.value() if (is_rr and g_type == "multiple") else 1
+        
+        teams = []
+        if self.chk_with_samples.isChecked():
+            sample_names = ["Hà Nội FC", "Hải Phòng FC", "Thép Xanh Nam Định", "Công An Hà Nội", "Becamex Bình Dương", "HAGL FC", "Thanh Hóa FC", "Viettel FC"]
+            for i, team_name in enumerate(sample_names):
+                group_char = "A" if (g_type == "multiple" and i < 4) else ("B" if (g_type == "multiple") else "A")
+                teams.append(Team(id=f"T-00{i+1}", name=team_name, group=group_char))
+                
+        new_tour = Tournament(
+            id=t_id,
+            name=name,
+            type=t_type,
+            num_groups=num_g,
+            group_type=g_type,
+            teams=teams,
+            matches=[],
+            created_at=datetime.datetime.now().isoformat()
+        )
+        
+        self.main_window.tournaments.append(new_tour)
+        self.main_window.active_tournament_id = t_id
+        
+        self.main_window.update_tournament_combobox()
+        self.main_window.save_state()
+        self.main_window.refresh_all_tabs()
+        
+        self.refresh_list()
+        self.txt_new_name.clear()
+        self.tabs.setCurrentIndex(0)
+        QMessageBox.information(self, "Thành công", f"Đã tạo thành công giải đấu mới: {name}")
+
+    def on_auto_save_toggled(self, checked):
+        self.main_window.is_auto_save_enabled = checked
+        self.main_window.save_state()
+
+    def export_json(self):
+        from main import save_tournaments_to_json
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Xuất file sao lưu cấu hình giải đấu", "backup_giai_dau.json", "JSON Files (*.json)"
+        )
+        if file_path:
+            try:
+                save_tournaments_to_json(
+                    file_path, 
+                    self.main_window.tournaments, 
+                    self.main_window.active_tournament_id, 
+                    self.main_window.is_auto_save_enabled
+                )
+                QMessageBox.information(self, "Thành công", f"Đã xuất file sao lưu thành công tại:\\n{file_path}")
+            except Exception as e:
+                QMessageBox.critical(self, "Lỗi", f"Có lỗi xảy ra khi xuất file: {str(e)}")
+
+    def import_json(self):
+        from main import load_tournaments_from_json
+        from PyQt6.QtWidgets import QFileDialog
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Mở file sao lưu cấu hình giải đấu", "", "JSON Files (*.json)"
+        )
+        if file_path:
+            try:
+                tours, active_id, auto_save = load_tournaments_from_json(file_path)
+                if not tours:
+                    raise Exception("File JSON không chứa dữ liệu giải đấu hợp lệ.")
+                    
+                self.main_window.tournaments = tours
+                self.main_window.active_tournament_id = active_id if active_id else tours[0].id
+                self.main_window.is_auto_save_enabled = auto_save
+                
+                self.main_window.update_tournament_combobox()
+                self.main_window.save_state()
+                self.main_window.refresh_all_tabs()
+                
+                self.refresh_list()
+                self.chk_auto_save.setChecked(auto_save)
+                QMessageBox.information(self, "Thành công", f"Đã nhập {len(tours)} giải đấu từ file sao lưu thành công!")
+            except Exception as e:
+                QMessageBox.critical(self, "Lỗi", f"Có lỗi xảy ra khi đọc file sao lưu:\\n{str(e)}")
+
 
 class TeamTab(QWidget):
     """Tab 1: Quản lý Đội bóng và cấu hình chia bảng"""
@@ -560,12 +843,13 @@ class TeamTab(QWidget):
         self.spin_groups.setRange(2, 8)
         self.spin_groups.setValue(2)
         self.spin_groups.setEnabled(False)
+        self.spin_groups.valueChanged.connect(self.on_spin_groups_changed)
         config_layout.addRow("Số lượng bảng:", self.spin_groups)
         
         group_config.setLayout(config_layout)
         left_panel.addWidget(group_config)
         
-        # Thao tác Đội bóng
+        # Quản lý Đội bóng
         team_group = QGroupBox("Quản lý Đội bóng")
         team_layout = QVBoxLayout()
         
@@ -611,16 +895,51 @@ class TeamTab(QWidget):
         layout.addLayout(right_panel, 2)
         self.setLayout(layout)
 
+    def refresh_config_views(self):
+        self.combo_type.blockSignals(True)
+        self.combo_group_type.blockSignals(True)
+        self.spin_groups.blockSignals(True)
+        
+        t = self.main_window.get_active_tournament()
+        is_rr = t.type == "ROUND_ROBIN"
+        self.combo_type.setCurrentIndex(0 if is_rr else 1)
+        
+        is_multiple = t.group_type == "multiple"
+        self.combo_group_type.setCurrentIndex(1 if is_multiple else 0)
+        self.combo_group_type.setEnabled(is_rr)
+        
+        self.spin_groups.setValue(t.num_groups)
+        self.spin_groups.setEnabled(is_rr and is_multiple)
+        
+        self.combo_type.blockSignals(False)
+        self.combo_group_type.blockSignals(False)
+        self.spin_groups.blockSignals(False)
+
     def on_type_changed(self, idx):
-        # Nếu đấu knockout thì khóa phần chia bảng (luôn là 1 nhánh chung)
         is_rr = idx == 0
         self.combo_group_type.setEnabled(is_rr)
         if not is_rr:
             self.combo_group_type.setCurrentIndex(0)
             self.spin_groups.setEnabled(False)
+        
+        t = self.main_window.get_active_tournament()
+        t.type = "ROUND_ROBIN" if is_rr else "KNOCK_OUT"
+        if not is_rr:
+            t.group_type = "single"
+        self.main_window.save_state()
 
     def on_group_type_changed(self, idx):
-        self.spin_groups.setEnabled(idx == 1)
+        is_multiple = idx == 1
+        self.spin_groups.setEnabled(is_multiple)
+        
+        t = self.main_window.get_active_tournament()
+        t.group_type = "multiple" if is_multiple else "single"
+        self.main_window.save_state()
+
+    def on_spin_groups_changed(self, val):
+        t = self.main_window.get_active_tournament()
+        t.num_groups = val
+        self.main_window.save_state()
 
     def update_team_table(self):
         teams = self.main_window.teams
@@ -634,13 +953,13 @@ class TeamTab(QWidget):
     def add_team(self):
         name, ok = QInputDialog.getText(self, "Thêm Đội", "Nhập tên đội bóng:")
         if ok and name.strip():
-            # Kiểm tra trùng tên
             if any(t.name.lower() == name.strip().lower() for t in self.main_window.teams):
                 QMessageBox.warning(self, "Lỗi", "Tên đội bóng đã tồn tại!")
                 return
             new_id = f"T-{uuid.uuid4().hex[:4].upper()}"
             team = Team(id=new_id, name=name.strip())
             self.main_window.teams.append(team)
+            self.main_window.save_state()
             self.update_team_table()
 
     def edit_team(self):
@@ -654,6 +973,7 @@ class TeamTab(QWidget):
         name, ok = QInputDialog.getText(self, "Sửa Đội", f"Nhập tên mới cho đội '{team.name}':", text=team.name)
         if ok and name.strip():
             team.name = name.strip()
+            self.main_window.save_state()
             self.update_team_table()
             self.main_window.standing_tab.refresh_standings()
 
@@ -671,6 +991,7 @@ class TeamTab(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             self.main_window.teams = [t for t in self.main_window.teams if t.id != team_id]
             self.main_window.matches = []  # Reset matches khi xóa đội
+            self.main_window.save_state()
             self.update_team_table()
             self.main_window.match_tab.refresh_matches()
             self.main_window.standing_tab.refresh_standings()
@@ -683,7 +1004,6 @@ class TeamTab(QWidget):
             
         is_rr = self.combo_type.currentIndex() == 0
         if not is_rr or self.combo_group_type.currentIndex() == 0:
-            # 1 bảng duy nhất
             for t in teams:
                 t.group = "A"
             QMessageBox.information(self, "Thông báo", "Đã gom toàn bộ các đội vào Bảng A!")
@@ -692,13 +1012,13 @@ class TeamTab(QWidget):
             shuffled_teams = list(teams)
             random.shuffle(shuffled_teams)
             
-            # Chia rải đều
             for i, t in enumerate(shuffled_teams):
-                group_char = chr(65 + (i % num_groups))  # A, B, C...
+                group_char = chr(65 + (i % num_groups))
                 t.group = group_char
                 
             QMessageBox.information(self, "Thành công", f"Đã chia ngẫu nhiên {len(teams)} đội vào {num_groups} Bảng!")
             
+        self.main_window.save_state()
         self.update_team_table()
 
     def generate_schedule(self):
@@ -711,8 +1031,6 @@ class TeamTab(QWidget):
         all_matches = []
         
         if is_rr:
-            # Đấu vòng tròn
-            # Gom đội theo từng bảng
             groups_dict = {}
             for t in teams:
                 grp = t.group or "A"
@@ -726,11 +1044,11 @@ class TeamTab(QWidget):
                 
             msg = f"Đã khởi tạo {len(all_matches)} trận đấu vòng tròn cho các bảng!"
         else:
-            # Knockout trực tiếp
             all_matches = generate_knockout(teams)
             msg = f"Đã bốc thăm {len(all_matches)} trận đấu theo sơ đồ nhánh đấu knockout!"
             
         self.main_window.matches = all_matches
+        self.main_window.save_state()
         self.main_window.match_tab.refresh_matches()
         self.main_window.standing_tab.refresh_standings()
         QMessageBox.information(self, "Thành công", msg)
@@ -796,7 +1114,6 @@ class MatchEditDialog(QDialog):
 
         layout.addLayout(form)
 
-        # Nút bấm lưu
         btns = QHBoxLayout()
         btn_save = QPushButton("Lưu kết quả")
         btn_save.clicked.connect(self.save)
@@ -835,7 +1152,6 @@ class MatchTab(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
         
-        # Tiêu đề bộ lọc
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Bộ lọc Vòng đấu:"))
         
@@ -852,10 +1168,8 @@ class MatchTab(QWidget):
         
         layout.addLayout(filter_layout)
 
-        # Sử dụng QSplitter để chia đôi màn hình: Trái hiển thị danh sách, Phải hiển thị nhánh đấu
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
-        # Panel Danh sách
         list_widget = QWidget()
         list_layout = QVBoxLayout(list_widget)
         list_layout.addWidget(QLabel("<b>Danh Sách Các Cặp Đấu</b>"))
@@ -869,7 +1183,6 @@ class MatchTab(QWidget):
         self.table_matches.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         list_layout.addWidget(self.table_matches)
         
-        # Panel Nhánh đấu (Sơ đồ Bracket thô cho Knock-out)
         bracket_widget = QWidget()
         bracket_layout = QVBoxLayout(bracket_widget)
         bracket_layout.addWidget(QLabel("<b>Nhánh Đấu / Bracket (Dành cho Knock-out)</b>"))
@@ -889,7 +1202,6 @@ class MatchTab(QWidget):
         matches = self.main_window.matches
         teams = self.main_window.teams
         
-        # Cập nhật filter ComboBox
         current_idx = self.combo_round_filter.currentIndex()
         self.combo_round_filter.blockSignals(True)
         self.combo_round_filter.clear()
@@ -903,7 +1215,6 @@ class MatchTab(QWidget):
             self.combo_round_filter.setCurrentIndex(current_idx)
         self.combo_round_filter.blockSignals(False)
 
-        # Lọc trận đấu
         selected_round = self.combo_round_filter.currentIndex()
         filtered_matches = matches
         if selected_round > 0:
@@ -926,13 +1237,11 @@ class MatchTab(QWidget):
             self.table_matches.setItem(r_idx, 6, QTableWidgetItem(m.referee or "Chưa có"))
             self.table_matches.setItem(r_idx, 7, QTableWidgetItem(time_str))
             
-            # Cột Thẻ phạt
             card_home = f"V:{m.home_yellow_cards}/Đ:{m.home_red_cards}" if m.played and not m.is_bye else "-"
             card_away = f"V:{m.away_yellow_cards}/Đ:{m.away_red_cards}" if m.played and not m.is_bye else "-"
             self.table_matches.setItem(r_idx, 8, QTableWidgetItem(card_home))
             self.table_matches.setItem(r_idx, 9, QTableWidgetItem(card_away))
 
-        # Cập nhật Bracket sơ đồ cây
         self.update_bracket_view()
 
     def update_bracket_view(self):
@@ -940,13 +1249,11 @@ class MatchTab(QWidget):
         matches = self.main_window.matches
         teams = self.main_window.teams
         
-        # Chỉ tạo sơ đồ bracket cho giải Knock-out
         ko_matches = [m for m in matches if m.id.startswith("KO-")]
         if not ko_matches:
             self.bracket_list.addItem("Sơ đồ cây chỉ hiển thị với Thể thức Knock-out.")
             return
 
-        # Nhóm theo vòng
         rounds_dict = {}
         for m in ko_matches:
             if m.round_num not in rounds_dict:
@@ -964,7 +1271,7 @@ class MatchTab(QWidget):
                 score_str = f"[{m.home_score} - {m.away_score}]" if m.played and not m.is_bye else "vs"
                 
                 self.bracket_list.addItem(f"  Trận {m.id.split('-M')[-1]}: {home_name} {score_str} {away_name}")
-            self.bracket_list.addItem("") # Dòng trống phân chia
+            self.bracket_list.addItem("")
 
     def update_match_result(self):
         selected = self.table_matches.currentRow()
@@ -979,11 +1286,9 @@ class MatchTab(QWidget):
             QMessageBox.information(self, "Thông báo", "Trận đấu nghỉ (BYE) không thể sửa kết quả tỷ số!")
             return
             
-        # Giải mã tên đội nhà/khách thực tế để hiển thị tiêu đề thoại
         home_display = get_team_display_name(match.home_team_id, self.main_window.teams, self.main_window.matches)
         away_display = get_team_display_name(match.away_team_id, self.main_window.teams, self.main_window.matches)
         
-        # Tạo bản sao giả định để đổi text ID tạm thời khi hiển thị thoại
         display_match = Match(
             id=match.id,
             round_num=match.round_num,
@@ -1004,7 +1309,6 @@ class MatchTab(QWidget):
 
         dialog = MatchEditDialog(display_match, self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
-            # Lưu dữ liệu từ display_match ngược lại match thực tế
             match.home_score = display_match.home_score
             match.away_score = display_match.away_score
             match.home_yellow_cards = display_match.home_yellow_cards
@@ -1016,16 +1320,39 @@ class MatchTab(QWidget):
             match.time_str = display_match.time_str
             match.played = True
             
-            # Cập nhật dây chuyền cho vòng tiếp theo nếu đấu Knock-out
             self.cascade_knockout_progression()
+            self.main_window.save_state()
             
             self.refresh_matches()
             self.main_window.standing_tab.refresh_standings()
 
     def cascade_knockout_progression(self):
-        """Hàm kiểm tra các trận đấu vòng sau có dùng đội thắng của trận này không để cập nhật tên"""
-        # (Thuật toán tự động liên kết các mã WIN:MatchID)
-        pass
+        """Hàm tự động đẩy đội thắng vòng Knockout lên trận đấu giữ chỗ tương ứng ở vòng sau"""
+        matches = self.main_window.matches
+        for m in matches:
+            if not m.id.startswith("KO-"):
+                continue
+            
+            # Nếu trận này chưa đá nhưng phụ thuộc vào đội thắng của trận trước
+            if not m.played:
+                if m.home_team_id.startswith("WIN:"):
+                    source_match_id = m.home_team_id[4:]
+                    source_match = next((x for x in matches if x.id == source_match_id), None)
+                    if source_match and source_match.played:
+                        # Tìm người thắng
+                        hs = source_match.home_score if source_match.home_score is not None else 0
+                        as_ = source_match.away_score if source_match.away_score is not None else 0
+                        winner_id = source_match.home_team_id if hs >= as_ else source_match.away_team_id
+                        m.home_team_id = winner_id
+                        
+                if m.away_team_id.startswith("WIN:"):
+                    source_match_id = m.away_team_id[4:]
+                    source_match = next((x for x in matches if x.id == source_match_id), None)
+                    if source_match and source_match.played:
+                        hs = source_match.home_score if source_match.home_score is not None else 0
+                        as_ = source_match.away_score if source_match.away_score is not None else 0
+                        winner_id = source_match.home_team_id if hs >= as_ else source_match.away_team_id
+                        m.away_team_id = winner_id
 
 
 class StandingsTab(QWidget):
@@ -1038,7 +1365,6 @@ class StandingsTab(QWidget):
     def init_ui(self):
         layout = QVBoxLayout()
         
-        # Panel lọc bảng đấu
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("<b>Bộ lọc Bảng xếp hạng:</b>"))
         
@@ -1050,7 +1376,6 @@ class StandingsTab(QWidget):
         
         layout.addLayout(filter_layout)
 
-        # Bảng xếp hạng chính
         self.table_standings = QTableWidget()
         self.table_standings.setColumnCount(12)
         self.table_standings.setHorizontalHeaderLabels([
@@ -1062,20 +1387,10 @@ class StandingsTab(QWidget):
         self.setLayout(layout)
 
     def calculate_standings_list(self, teams, matches, filter_group=None) -> list:
-        """
-        Thuật toán tính điểm thời gian thực:
-        Thắng = 3 điểm, Hòa = 1 điểm, Thua = 0 điểm.
-        Sắp xếp theo thứ tự:
-        1. Points (Điểm)
-        2. Goal Difference (Hiệu số)
-        3. Discipline Points (Ít điểm kỷ luật hơn) -> Thẻ đỏ = 3đ, thẻ vàng = 1đ
-        4. Goals Scored (Bàn thắng nhiều hơn)
-        """
         filtered_teams = [t for t in teams if t.id != "BYE"]
         if filter_group:
             filtered_teams = [t for t in filtered_teams if t.group == filter_group]
 
-        # Khởi tạo bản ghi
         standings_map = {}
         for t in filtered_teams:
             standings_map[t.id] = TeamStanding(
@@ -1085,7 +1400,6 @@ class StandingsTab(QWidget):
                 yellow_cards=0, red_cards=0, discipline_points=0, points=0
             )
 
-        # Tính toán dựa trên các trận đã đá
         for m in matches:
             if not m.played or m.is_bye:
                 continue
@@ -1119,7 +1433,6 @@ class StandingsTab(QWidget):
                 away_rec.drawn += 1
                 away_rec.points += 1
 
-            # Cộng điểm thẻ phạt
             home_rec.yellow_cards += m.home_yellow_cards
             home_rec.red_cards += m.home_red_cards
             home_rec.discipline_points += m.home_yellow_cards * 1 + m.home_red_cards * 3
@@ -1128,14 +1441,12 @@ class StandingsTab(QWidget):
             away_rec.red_cards += m.away_red_cards
             away_rec.discipline_points += m.away_yellow_cards * 1 + m.away_red_cards * 3
 
-        # Tính hiệu số và chuyển dạng list
         standings_list = list(standings_map.values())
         for r in standings_list:
             r.goal_difference = r.goals_for - r.goals_against
 
-        # Tiến hành sắp xếp chuẩn FIFA
         def get_sort_key(item):
-            # Điểm cao nhất -> Hiệu số cao nhất -> Điểm kỷ luật thấp nhất (dùng âm để sắp giảm dần) -> Bàn thắng nhiều nhất
+            # Điểm cao nhất -> Hiệu số cao nhất -> Điểm kỷ luật thấp nhất (dùng âm) -> Bàn thắng nhiều nhất
             return (item.points, item.goal_difference, -item.discipline_points, item.goals_for)
 
         standings_list.sort(key=get_sort_key, reverse=True)
@@ -1145,7 +1456,6 @@ class StandingsTab(QWidget):
         teams = self.main_window.teams
         matches = self.main_window.matches
         
-        # Cập nhật filter
         current_idx = self.combo_group_filter.currentIndex()
         self.combo_group_filter.blockSignals(True)
         self.combo_group_filter.clear()
@@ -1159,7 +1469,6 @@ class StandingsTab(QWidget):
             self.combo_group_filter.setCurrentIndex(current_idx)
         self.combo_group_filter.blockSignals(False)
 
-        # Tính toán dữ liệu
         selected_grp = None
         if self.combo_group_filter.currentIndex() > 0:
             selected_grp = self.combo_group_filter.currentText().replace("Bảng ", "")
@@ -1178,14 +1487,12 @@ class StandingsTab(QWidget):
             self.table_standings.setItem(r_idx, 7, QTableWidgetItem(str(std.goals_against)))
             self.table_standings.setItem(r_idx, 8, QTableWidgetItem(str(std.goal_difference)))
             
-            # Thẻ phạt
             cards_str = f"V:{std.yellow_cards} | Đ:{std.red_cards}"
             self.table_standings.setItem(r_idx, 9, QTableWidgetItem(cards_str))
             self.table_standings.setItem(r_idx, 10, QTableWidgetItem(str(std.discipline_points)))
             
-            # Điểm số nổi bật
             pt_item = QTableWidgetItem(str(std.points))
-            pt_item.setFont(Qt.ItemFlag.ItemIsEnabled) # Đậm
+            pt_item.setFont(Qt.ItemFlag.ItemIsEnabled)
             self.table_standings.setItem(r_idx, 11, pt_item)
 
 
@@ -1203,8 +1510,8 @@ class ExportTab(QWidget):
         info_layout = QVBoxLayout()
         
         lbl_desc = QLabel(
-            "Tính năng này cho phép bạn xuất toàn bộ dữ liệu hiện tại của giải đấu\n"
-            "bao gồm: Danh sách đội, Lịch thi đấu, Trọng tài, Bàn thắng và Điểm số\n"
+            "Tính năng này cho phép bạn xuất toàn bộ dữ liệu hiện tại của giải đấu\\n"
+            "bao gồm: Danh sách đội, Lịch thi đấu, Trọng tài, Bàn thắng và Điểm số\\n"
             "ra một file Excel chuyên nghiệp với nhiều trang tính phân định rõ ràng."
         )
         lbl_desc.setStyleSheet("line-height: 1.5; font-size: 11px;")
@@ -1233,11 +1540,10 @@ class ExportTab(QWidget):
         )
         if file_path:
             try:
-                # Hàm Callback lấy điểm từ StandingTab
                 func = self.main_window.standing_tab.calculate_standings_list
                 success = export_to_excel(file_path, self.main_window.teams, self.main_window.matches, func)
                 if success:
-                    QMessageBox.information(self, "Thành công", f"Đã xuất file báo cáo giải đấu thành công tại:\n{file_path}")
+                    QMessageBox.information(self, "Thành công", f"Đã xuất file báo cáo giải đấu thành công tại:\\n{file_path}")
             except Exception as e:
                 QMessageBox.critical(self, "Lỗi hệ thống", f"Có lỗi xảy ra khi xuất báo cáo: {str(e)}")
 `
@@ -1246,36 +1552,241 @@ class ExportTab(QWidget):
     name: "main.py",
     description: "Điểm khởi chạy ứng dụng (Entry point), thiết lập QMainWindow và chạy QTabWidget chính.",
     content: `import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QMessageBox
+import os
+import json
+import uuid
+import datetime
+from PyQt6.QtWidgets import QApplication, QMainWindow, QTabWidget, QMessageBox, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QPushButton
 from PyQt6.QtGui import QIcon
-from models import Team, Match
-from views import TeamTab, MatchTab, StandingsTab, ExportTab
+from models import Team, Match, Tournament
+from views import TeamTab, MatchTab, StandingsTab, ExportTab, TournamentManagerDialog
+
+def save_tournaments_to_json(filepath, tournaments, active_id, auto_save_enabled):
+    data = {
+        "active_tournament_id": active_id,
+        "is_auto_save_enabled": auto_save_enabled,
+        "tournaments": []
+    }
+    for t in tournaments:
+        t_data = {
+            "id": t.id,
+            "name": t.name,
+            "type": t.type,
+            "num_groups": t.num_groups,
+            "group_type": t.group_type,
+            "created_at": t.created_at,
+            "teams": [{"id": team.id, "name": team.name, "group": team.group} for team in t.teams],
+            "matches": []
+        }
+        for m in t.matches:
+            t_data["matches"].append({
+                "id": m.id,
+                "round_num": m.round_num,
+                "round_name": m.round_name,
+                "home_team_id": m.home_team_id,
+                "away_team_id": m.away_team_id,
+                "home_score": m.home_score,
+                "away_score": m.away_score,
+                "played": m.played,
+                "group": m.group,
+                "date_str": m.date_str,
+                "time_str": m.time_str,
+                "referee": m.referee,
+                "home_yellow_cards": m.home_yellow_cards,
+                "home_red_cards": m.home_red_cards,
+                "away_yellow_cards": m.away_yellow_cards,
+                "away_red_cards": m.away_red_cards,
+                "is_bye": m.is_bye
+            })
+        data["tournaments"].append(t_data)
+        
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+def load_tournaments_from_json(filepath) -> tuple:
+    with open(filepath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        
+    tournaments = []
+    for t_data in data.get("tournaments", []):
+        teams = []
+        for team_data in t_data.get("teams", []):
+            teams.append(Team(
+                id=team_data.get("id"),
+                name=team_data.get("name"),
+                group=team_data.get("group")
+            ))
+            
+        matches = []
+        for m_data in t_data.get("matches", []):
+            matches.append(Match(
+                id=m_data.get("id"),
+                round_num=m_data.get("round_num", 1),
+                round_name=m_data.get("round_name", ""),
+                home_team_id=m_data.get("home_team_id", ""),
+                away_team_id=m_data.get("away_team_id", ""),
+                home_score=m_data.get("home_score"),
+                away_score=m_data.get("away_score"),
+                played=m_data.get("played", False),
+                group=m_data.get("group"),
+                date_str=m_data.get("date_str", ""),
+                time_str=m_data.get("time_str", ""),
+                referee=m_data.get("referee", ""),
+                home_yellow_cards=m_data.get("home_yellow_cards", 0),
+                home_red_cards=m_data.get("home_red_cards", 0),
+                away_yellow_cards=m_data.get("away_yellow_cards", 0),
+                away_red_cards=m_data.get("away_red_cards", 0),
+                is_bye=m_data.get("is_bye", False)
+            ))
+            
+        tournaments.append(Tournament(
+            id=t_data.get("id"),
+            name=t_data.get("name"),
+            type=t_data.get("type"),
+            num_groups=t_data.get("num_groups", 1),
+            group_type=t_data.get("group_type", "single"),
+            teams=teams,
+            matches=matches,
+            created_at=t_data.get("created_at", "")
+        ))
+        
+    return (
+        tournaments,
+        data.get("active_tournament_id", ""),
+        data.get("is_auto_save_enabled", True)
+    )
 
 class MainWindow(QMainWindow):
-    """Cửa sổ chính của chương trình quản lý và chia cặp đấu giải bóng đá"""
+    """Cửa sổ chính của chương trình quản lý giải bóng đá"""
+    BACKUP_FILE = "football_tournaments_backup.json"
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Hệ thống Quản lý và Chia cặp đấu giải Bóng đá (PyQt6)")
-        self.resize(1100, 700)
+        self.resize(1100, 750)
         
-        # Cơ sở dữ liệu tạm thời
-        self.teams = []
-        self.matches = []
+        # State
+        self.tournaments = []
+        self.active_tournament_id = ""
+        self.is_auto_save_enabled = True
         
         self.init_data()
         self.init_ui()
 
     def init_data(self):
-        """Khởi tạo một số dữ liệu mẫu ban đầu để kiểm tra ứng dụng dễ dàng"""
+        """Khởi động ứng dụng: đọc file dự phòng nếu có, hoặc tạo giải đấu mặc định ban đầu"""
+        if os.path.exists(self.BACKUP_FILE):
+            try:
+                tours, active_id, auto_save = load_tournaments_from_json(self.BACKUP_FILE)
+                if tours:
+                    self.tournaments = tours
+                    self.active_tournament_id = active_id if active_id else tours[0].id
+                    self.is_auto_save_enabled = auto_save
+                    return
+            except Exception as e:
+                print(f"Lỗi đọc file backup JSON: {str(e)}")
+                
+        # Nếu chưa có file hoặc đọc lỗi, khởi tạo giải đấu mặc định đầu tiên
+        t_id = "TOURNAMENT-DEFAULT"
         sample_names = ["Hà Nội FC", "Hải Phòng FC", "Thép Xanh Nam Định", "Công An Hà Nội", "Becamex Bình Dương", "HAGL FC", "Thanh Hóa FC", "Viettel FC"]
+        default_teams = []
         for i, name in enumerate(sample_names):
-            # Mặc định chia 2 bảng
             group_char = "A" if i < 4 else "B"
-            self.teams.append(Team(id=f"T-00{i+1}", name=name, group=group_char))
+            default_teams.append(Team(id=f"T-00{i+1}", name=name, group=group_char))
+            
+        default_tournament = Tournament(
+            id=t_id,
+            name="Giải vô địch Quốc gia V-League Pro",
+            type="ROUND_ROBIN",
+            num_groups=2,
+            group_type="multiple",
+            teams=default_teams,
+            matches=[],
+            created_at=datetime.datetime.now().isoformat()
+        )
+        
+        self.tournaments = [default_tournament]
+        self.active_tournament_id = t_id
+        self.save_state()
+
+    def get_active_tournament(self) -> Tournament:
+        active = next((t for t in self.tournaments if t.id == self.active_tournament_id), None)
+        if not active:
+            if self.tournaments:
+                self.active_tournament_id = self.tournaments[0].id
+                return self.tournaments[0]
+            else:
+                self.init_data()
+                return self.tournaments[0]
+        return active
+
+    @property
+    def teams(self):
+        return self.get_active_tournament().teams
+
+    @teams.setter
+    def teams(self, value):
+        self.get_active_tournament().teams = value
+        self.save_state()
+
+    @property
+    def matches(self):
+        return self.get_active_tournament().matches
+
+    @matches.setter
+    def matches(self, value):
+        self.get_active_tournament().matches = value
+        self.save_state()
+
+    def save_state(self):
+        if self.is_auto_save_enabled:
+            try:
+                save_tournaments_to_json(
+                    self.BACKUP_FILE,
+                    self.tournaments,
+                    self.active_tournament_id,
+                    self.is_auto_save_enabled
+                )
+            except Exception as e:
+                print(f"Lỗi tự động sao lưu: {str(e)}")
 
     def init_ui(self):
+        # Layout tổng thể
+        central_widget = QWidget()
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # --- Thanh Header chọn giải đấu ---
+        header_widget = QWidget()
+        header_widget.setStyleSheet("background-color: #f1f3f5; border-bottom: 1px solid #dee2e6;")
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(15, 10, 15, 10)
+        
+        lbl_select = QLabel("<b>Giải đấu đang chọn:</b>")
+        lbl_select.setStyleSheet("font-size: 13px;")
+        header_layout.addWidget(lbl_select)
+        
+        self.combo_active_tournament = QComboBox()
+        self.combo_active_tournament.setMinimumWidth(300)
+        self.combo_active_tournament.setStyleSheet("padding: 4px; font-weight: bold;")
+        self.combo_active_tournament.currentIndexChanged.connect(self.on_active_tournament_changed)
+        header_layout.addWidget(self.combo_active_tournament)
+        
+        self.btn_manage_tournaments = QPushButton("⚙️ Quản lý Giải đấu")
+        self.btn_manage_tournaments.setStyleSheet(
+            "background-color: #495057; color: white; font-weight: bold; padding: 5px 12px; border-radius: 4px;"
+        )
+        self.btn_manage_tournaments.clicked.connect(self.manage_tournaments)
+        header_layout.addWidget(self.btn_manage_tournaments)
+        
+        header_layout.addStretch()
+        
+        main_layout.addWidget(header_widget)
+        
         # QTabWidget chính
         self.tabs = QTabWidget()
+        self.tabs.setStyleSheet("QTabBar::tab { padding: 10px 20px; font-weight: bold; }")
         
         self.team_tab = TeamTab(self)
         self.match_tab = MatchTab(self)
@@ -1287,19 +1798,44 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.standing_tab, "🏆 Bảng xếp hạng")
         self.tabs.addTab(self.export_tab, "📥 Xuất Excel")
         
-        self.setCentralWidget(self.tabs)
+        main_layout.addWidget(self.tabs)
+        self.setCentralWidget(central_widget)
         
-        # Đổ dữ liệu lên bảng ban đầu
+        # Đồng bộ Combo chọn giải đấu
+        self.update_tournament_combobox()
+        self.refresh_all_tabs()
+
+    def update_tournament_combobox(self):
+        self.combo_active_tournament.blockSignals(True)
+        self.combo_active_tournament.clear()
+        for t in self.tournaments:
+            self.combo_active_tournament.addItem(t.name, t.id)
+            
+        idx = self.combo_active_tournament.findData(self.active_tournament_id)
+        if idx >= 0:
+            self.combo_active_tournament.setCurrentIndex(idx)
+        self.combo_active_tournament.blockSignals(False)
+
+    def on_active_tournament_changed(self, idx):
+        if idx < 0:
+            return
+        t_id = self.combo_active_tournament.itemData(idx)
+        self.active_tournament_id = t_id
+        self.save_state()
+        self.refresh_all_tabs()
+
+    def manage_tournaments(self):
+        dialog = TournamentManagerDialog(self, self)
+        dialog.exec()
+
+    def refresh_all_tabs(self):
+        self.team_tab.refresh_config_views()
         self.team_tab.update_team_table()
-        
-        # Khóa hoặc nhắc nhở xếp lịch ban đầu
         self.match_tab.refresh_matches()
         self.standing_tab.refresh_standings()
 
 def main():
     app = QApplication(sys.argv)
-    
-    # Thiết lập giao diện Fusion hiện đại, thanh lịch
     app.setStyle("Fusion")
     
     window = MainWindow()

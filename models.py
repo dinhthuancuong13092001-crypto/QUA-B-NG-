@@ -44,3 +44,14 @@ class TeamStanding:
     red_cards: int = 0
     discipline_points: int = 0  # Điểm phạt kỷ luật: 1 thẻ đỏ = 3đ, 1 thẻ vàng = 1đ
     points: int = 0           # Điểm số chuẩn FIFA: Thắng = 3đ, Hòa = 1đ, Thua = 0đ
+
+@dataclass
+class Tournament:
+    id: str
+    name: str
+    type: str                 # "ROUND_ROBIN" hoặc "KNOCK_OUT"
+    num_groups: int = 1
+    group_type: str = "single"  # "single" hoặc "multiple"
+    teams: List[Team] = field(default_factory=list)
+    matches: List[Match] = field(default_factory=list)
+    created_at: str = ""
