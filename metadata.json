@@ -1,0 +1,6 @@
+{
+  "name": "Quản lý Giải đấu Bóng đá",
+  "description": "Hệ thống quản lý, chia bảng, bốc thăm xếp lịch đấu vòng tròn/knock-out và tính điểm bảng xếp hạng bóng đá.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
