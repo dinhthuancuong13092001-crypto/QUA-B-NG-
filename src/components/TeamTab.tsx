@@ -53,6 +53,17 @@ export default function TeamTab({
     setSelectedTeamIds((prev) => prev.filter((id) => teamIds.includes(id)));
   }, [teams]);
 
+  const availableGroups = groupType === "single"
+    ? ["A"]
+    : Array.from({ length: numGroups }, (_, i) => String.fromCharCode(65 + i));
+
+  const handleGroupChange = (teamId: string, newGroup: string) => {
+    setTeams((prev) =>
+      prev.map((t) => (t.id === teamId ? { ...t, group: newGroup } : t))
+    );
+    showToast(`Đã chuyển đội bóng sang Bảng ${newGroup}!`, "success");
+  };
+
   const handleQuickImport = () => {
     const lines = quickImportText
       .split(/[\n,;]+/)
@@ -477,10 +488,18 @@ export default function TeamTab({
                           )}
                         </td>
                         <td className="p-2.5 text-center">
-                          {team.group ? (
-                            <span className={`inline-block px-2 py-0.5 text-[10px] font-bold border rounded ${groupBadgeColor}`}>
-                              Bảng {team.group}
-                            </span>
+                          {tournamentType === TournamentType.ROUND_ROBIN ? (
+                            <select
+                              value={team.group || "A"}
+                              onChange={(e) => handleGroupChange(team.id, e.target.value)}
+                              className={`px-2 py-0.5 text-[10px] font-bold border rounded cursor-pointer focus:outline-none focus:ring-1 focus:ring-blue-500 ${groupBadgeColor}`}
+                            >
+                              {availableGroups.map((g) => (
+                                <option key={g} value={g} className="bg-white text-slate-800 font-bold">
+                                  Bảng {g}
+                                </option>
+                              ))}
+                            </select>
                           ) : (
                             <span className="text-[10px] text-slate-400 italic">Knock-out</span>
                           )}

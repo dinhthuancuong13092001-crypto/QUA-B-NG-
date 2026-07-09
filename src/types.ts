@@ -20,6 +20,17 @@ export enum TournamentType {
   ROUND_ROBIN = "ROUND_ROBIN",
 }
 
+export interface Tournament {
+  id: string;
+  name: string;
+  type: TournamentType;
+  numGroups: number;
+  groupType: "single" | "multiple";
+  teams: Team[];
+  matches: Match[];
+  createdAt?: string;
+}
+
 export interface Match {
   id: string;
   round: number; // Vòng đấu (1, 2, 3...)
