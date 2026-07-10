@@ -44,10 +44,13 @@ export interface Match {
   date?: string; // Ngày thi đấu
   time?: string; // Giờ thi đấu
   referee?: string; // Trọng tài bắt chính
+  location?: string; // Sân vận động / Địa điểm thi đấu (vị trí trận đấu)
   homeYellowCards: number;
   homeRedCards: number;
+  homeRedCardNotes?: string; // Chi tiết thẻ đỏ đội nhà
   awayYellowCards: number;
   awayRedCards: number;
+  awayRedCardNotes?: string; // Chi tiết thẻ đỏ đội khách
   isBye?: boolean; // Trận đấu với đội "Nghỉ"
 }
 

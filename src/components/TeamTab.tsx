@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Team, TournamentType } from "../types";
-import { Plus, Edit2, Trash2, Shuffle, Calendar, Sparkles } from "lucide-react";
+import { Plus, Edit2, Trash2, Shuffle, Calendar, Sparkles, ArrowUp, ArrowDown } from "lucide-react";
 import { motion } from "motion/react";
 
 interface TeamTabProps {
@@ -166,6 +166,18 @@ export default function TeamTab({
     setTeamToDelete(team);
   };
 
+  const handleMoveTeam = (index: number, direction: "up" | "down") => {
+    const targetIdx = direction === "up" ? index - 1 : index + 1;
+    if (targetIdx < 0 || targetIdx >= teams.length) return;
+    setTeams((prev) => {
+      const updated = [...prev];
+      const temp = updated[index];
+      updated[index] = updated[targetIdx];
+      updated[targetIdx] = temp;
+      return updated;
+    });
+  };
+
   // Chia bảng ngẫu nhiên dựa trên số lượng bảng cấu hình
   const handleShuffleGroups = () => {
     if (teams.length === 0) {
@@ -207,18 +219,18 @@ export default function TeamTab({
       {/* Cấu hình & Thêm đội (Cột Trái) */}
       <div id="config-panel" className="lg:col-span-5 flex flex-col gap-4">
         {/* Cấu hình Thể Thức */}
-        <div className="bg-white rounded-lg border border-slate-300 shadow-sm flex flex-col overflow-hidden">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+        <div className="bg-white rounded-xl border border-blue-100 shadow-sm flex flex-col overflow-hidden">
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50/50 border-b border-blue-100 flex justify-between items-center">
+            <h2 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-blue-600" />
               Cấu hình thể thức giải đấu
             </h2>
           </div>
           <div className="p-4 space-y-4">
             <div>
-              <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Thể thức thi đấu</label>
+              <label className="block text-[10px] font-bold text-blue-900/60 uppercase mb-1">Thể thức thi đấu</label>
               <select
-                className="w-full bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5 text-xs font-medium text-slate-700 focus:outline-none focus:border-blue-600 transition-all"
+                className="w-full bg-slate-50/80 border border-blue-100 rounded-lg px-2.5 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all cursor-pointer"
                 value={tournamentType}
                 onChange={(e) => {
                   const val = e.target.value as TournamentType;
@@ -239,18 +251,18 @@ export default function TeamTab({
               <motion.div
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-4 border-t border-slate-200 pt-3"
+                className="space-y-4 border-t border-blue-50 pt-3"
               >
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Cấu hình phân bảng</label>
+                  <label className="block text-[10px] font-bold text-blue-900/60 uppercase mb-1">Cấu hình phân bảng</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setGroupType("single")}
-                      className={`py-1.5 text-xs font-bold rounded transition-all cursor-pointer ${
+                      className={`py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                         groupType === "single"
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                          : "bg-blue-50 text-blue-800 hover:bg-blue-100/75"
                       }`}
                     >
                       1 Bảng duy nhất
@@ -258,10 +270,10 @@ export default function TeamTab({
                     <button
                       type="button"
                       onClick={() => setGroupType("multiple")}
-                      className={`py-1.5 text-xs font-bold rounded transition-all cursor-pointer ${
+                      className={`py-2 text-xs font-extrabold rounded-lg transition-all cursor-pointer ${
                         groupType === "multiple"
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                          ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                          : "bg-blue-50 text-blue-800 hover:bg-blue-100/75"
                       }`}
                     >
                       Chia nhiều Bảng
@@ -273,19 +285,19 @@ export default function TeamTab({
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: "auto" }}
-                    className="flex items-center justify-between bg-slate-50 p-2.5 rounded border border-slate-200"
+                    className="flex items-center justify-between bg-blue-50/50 p-2.5 rounded-lg border border-blue-100"
                   >
-                    <span className="text-[11px] text-slate-500 font-semibold uppercase">Số lượng bảng đấu:</span>
+                    <span className="text-[11px] text-blue-900 font-bold uppercase">Số lượng bảng đấu:</span>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
                         min="2"
                         max="8"
-                        className="w-16 bg-white border border-slate-300 rounded px-2 py-1 text-xs text-center font-bold text-slate-800"
+                        className="w-16 bg-white border border-blue-200 rounded-md px-2 py-1 text-xs text-center font-extrabold text-blue-900 focus:outline-none focus:border-blue-500"
                         value={numGroups}
                         onChange={(e) => setNumGroups(Math.max(2, Math.min(8, parseInt(e.target.value) || 2)))}
                       />
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">Bảng</span>
+                      <span className="text-[10px] text-blue-800 font-bold uppercase">Bảng</span>
                     </div>
                   </motion.div>
                 )}
@@ -295,9 +307,9 @@ export default function TeamTab({
         </div>
 
         {/* Thêm Đội bóng & Thao tác */}
-        <div className="bg-white rounded-lg border border-slate-300 shadow-sm flex flex-col overflow-hidden">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-            <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+        <div className="bg-white rounded-xl border border-blue-100 shadow-sm flex flex-col overflow-hidden">
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50/50 border-b border-blue-100 flex justify-between items-center">
+            <h2 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider">
               {showQuickImport ? "Nhập nhanh danh sách" : "Thêm đội bóng mới"}
             </h2>
             <button
@@ -307,10 +319,10 @@ export default function TeamTab({
                 setQuickImportText("");
                 setNewTeamName("");
               }}
-              className="text-[10px] text-blue-600 hover:text-blue-700 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+              className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-1 cursor-pointer hover:underline"
             >
               <Sparkles className="w-3 h-3 text-blue-500" />
-              {showQuickImport ? "Quay lại thêm lẻ" : "Nhập nhanh/Hàng loạt"}
+              {showQuickImport ? "Quay lại thêm lẻ" : "Nhập nhanh hàng loạt"}
             </button>
           </div>
           <div className="p-4 space-y-4">
@@ -322,14 +334,14 @@ export default function TeamTab({
                 <textarea
                   rows={4}
                   placeholder="Ví dụ:&#10;Hải Phòng FC&#10;Sông Lam Nghệ An&#10;Bình Định, Khánh Hòa"
-                  className="w-full bg-slate-50 border border-slate-300 rounded p-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all font-sans leading-relaxed"
+                  className="w-full bg-slate-50 border border-blue-100 rounded-lg p-2.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-sans leading-relaxed"
                   value={quickImportText}
                   onChange={(e) => setQuickImportText(e.target.value)}
                 />
                 <button
                   type="button"
                   onClick={handleQuickImport}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-3 rounded text-xs transition-all shadow-xs uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 px-3 rounded-lg text-xs transition-all shadow-md shadow-blue-200 uppercase cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Plus className="w-4 h-4" /> Xác nhận nhập danh sách
                 </button>
@@ -339,28 +351,28 @@ export default function TeamTab({
                 <input
                   type="text"
                   placeholder="Nhập tên đội bóng..."
-                  className="flex-1 bg-slate-50 border border-slate-300 rounded px-3 py-1.5 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 transition-all"
+                  className="flex-1 bg-slate-50/80 border border-blue-100 rounded-lg px-3 py-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
                 />
                 <button
                   type="submit"
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded transition-all shadow-xs flex items-center justify-center cursor-pointer font-bold text-xs"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-all shadow-md shadow-blue-100 flex items-center justify-center cursor-pointer font-extrabold text-xs"
                 >
                   <Plus className="w-4 h-4 mr-1" /> Thêm
                 </button>
               </form>
             )}
 
-            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200">
+            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-blue-50">
               {tournamentType === TournamentType.ROUND_ROBIN && (
                 <button
                   type="button"
                   onClick={handleShuffleGroups}
-                  className="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2 px-3 rounded flex items-center justify-center gap-1.5 cursor-pointer transition-all"
+                  className="border border-blue-200 hover:bg-blue-50 text-blue-700 text-xs font-bold py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                 >
-                  <Shuffle className="w-3.5 h-3.5 text-slate-400" />
-                  Chia bảng ngẫu nhiên
+                  <Shuffle className="w-3.5 h-3.5 text-blue-500" />
+                  Xáo bảng ngẫu nhiên
                 </button>
               )}
               <button
@@ -372,10 +384,12 @@ export default function TeamTab({
                     onGenerateSchedule();
                   }
                 }}
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-xs"
+                className={`bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold py-2.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-md shadow-emerald-100 ${
+                  tournamentType !== TournamentType.ROUND_ROBIN ? "col-span-2" : ""
+                }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
-                Tạo Lịch Thi Đấu ⚽
+                Lập Lịch Thi Đấu ⚽
               </button>
             </div>
           </div>
@@ -384,39 +398,39 @@ export default function TeamTab({
 
       {/* Danh sách đội & Nhóm (Cột Phải) */}
       <div id="teams-list-panel" className="lg:col-span-7 flex flex-col">
-        <div className="bg-white rounded-lg border border-slate-300 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
-          <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+        <div className="bg-white rounded-xl border border-blue-100 shadow-sm flex flex-col overflow-hidden min-h-[400px]">
+          <div className="p-3 bg-gradient-to-r from-blue-50 to-cyan-50/50 border-b border-blue-100 flex justify-between items-center">
             <div className="flex items-center gap-3">
-              <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <h2 className="text-xs font-extrabold text-blue-900 uppercase tracking-wider">
                 Danh sách Đội bóng tham gia ({teams.length} đội)
               </h2>
               {selectedTeamIds.length > 0 && (
                 <button
                   onClick={() => setIsConfirmBulkDeleteOpen(true)}
-                  className="bg-rose-600 hover:bg-rose-700 text-white font-bold px-2 py-1 rounded text-[10px] uppercase cursor-pointer flex items-center gap-1 shadow-xs transition-all animate-fade-in"
+                  className="bg-rose-500 hover:bg-rose-600 text-white font-extrabold px-3 py-1 rounded-md text-[10px] uppercase cursor-pointer flex items-center gap-1 shadow-md transition-all animate-fade-in"
                 >
                   <Trash2 className="w-3 h-3" />
                   Xóa {selectedTeamIds.length} đội đã chọn
                 </button>
               )}
             </div>
-            <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold uppercase">
+            <span className="text-[10px] bg-blue-600 text-white px-2.5 py-0.5 rounded-full font-extrabold uppercase shadow-sm">
               {tournamentType === TournamentType.KNOCKOUT ? "Knock-out" : "Đấu vòng tròn"}
             </span>
           </div>
 
           {teams.length === 0 ? (
-            <div className="flex-1 flex flex-col justify-center items-center py-12 text-center text-slate-400 border border-dashed border-slate-200 m-4 rounded-lg space-y-2">
-              <p className="text-sm font-medium">Chưa có đội bóng nào tham gia.</p>
+            <div className="flex-1 flex flex-col justify-center items-center py-12 text-center text-slate-400 border border-dashed border-blue-100 m-4 rounded-lg space-y-2">
+              <p className="text-sm font-bold text-blue-900/60">Chưa có đội bóng nào tham gia.</p>
               <p className="text-xs text-slate-400">Hãy thêm tên đội bóng ở khung bên trái để bắt đầu.</p>
             </div>
           ) : (
             <div className="flex-1 overflow-auto">
               {/* Bảng danh sách đội bóng chuẩn High Density desktop */}
               <table className="w-full text-left text-xs border-collapse">
-                <thead className="bg-slate-100 text-slate-600 sticky top-0 border-b border-slate-200">
+                <thead className="bg-blue-50/50 text-blue-900 sticky top-0 border-b border-blue-100">
                   <tr>
-                    <th className="p-2.5 text-center w-10">
+                    <th className="p-3 text-center w-10">
                       <input
                         type="checkbox"
                         className="cursor-pointer accent-blue-600 rounded"
@@ -430,14 +444,14 @@ export default function TeamTab({
                         }}
                       />
                     </th>
-                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center w-12">#</th>
-                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">ID</th>
-                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px]">Tên Đội Bóng</th>
-                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center w-28">Bảng đấu</th>
-                    <th className="p-2.5 font-bold uppercase tracking-wider text-[10px] text-center w-28">Thao tác</th>
+                    <th className="p-3 font-extrabold uppercase tracking-wider text-[9px] text-center w-12 text-blue-900/60">#</th>
+                    <th className="p-3 font-extrabold uppercase tracking-wider text-[9px] text-blue-900/60">ID</th>
+                    <th className="p-3 font-extrabold uppercase tracking-wider text-[9px] text-blue-900/60">Tên Đội Bóng</th>
+                    <th className="p-3 font-extrabold uppercase tracking-wider text-[9px] text-blue-900/60 text-center w-28">Bảng đấu</th>
+                    <th className="p-3 font-extrabold uppercase tracking-wider text-[9px] text-blue-900/60 text-center w-28">Thao tác</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-150">
+                <tbody className="divide-y divide-blue-50">
                   {teams.map((team, idx) => {
                     const isEditing = editingTeamId === team.id;
                     const isSelected = selectedTeamIds.includes(team.id);
@@ -505,16 +519,37 @@ export default function TeamTab({
                           )}
                         </td>
                         <td className="p-2.5 text-center">
-                          <div className="inline-flex gap-2">
+                          <div className="inline-flex gap-2 items-center">
+                            <button
+                              disabled={idx === 0}
+                              onClick={() => handleMoveTeam(idx, "up")}
+                              className={`p-1 rounded transition-all cursor-pointer ${
+                                idx === 0 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                              }`}
+                              title="Di chuyển lên"
+                            >
+                              <ArrowUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              disabled={idx === teams.length - 1}
+                              onClick={() => handleMoveTeam(idx, "down")}
+                              className={`p-1 rounded transition-all cursor-pointer ${
+                                idx === teams.length - 1 ? "text-slate-300 cursor-not-allowed" : "text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                              }`}
+                              title="Di chuyển xuống"
+                            >
+                              <ArrowDown className="w-3.5 h-3.5" />
+                            </button>
+                            <div className="w-[1px] h-4 bg-blue-100 mx-0.5"></div>
                             <button
                               onClick={() => handleStartEdit(team)}
-                              className="text-xs text-slate-500 hover:text-blue-600 font-bold px-1.5 py-0.5 rounded hover:bg-slate-100 transition-all cursor-pointer"
+                              className="text-xs text-slate-500 hover:text-blue-600 font-extrabold px-2 py-0.5 rounded hover:bg-blue-50 transition-all cursor-pointer"
                             >
                               Sửa
                             </button>
                             <button
                               onClick={() => handleDeleteTeam(team)}
-                              className="text-xs text-slate-500 hover:text-rose-600 font-bold px-1.5 py-0.5 rounded hover:bg-rose-50 transition-all cursor-pointer"
+                              className="text-xs text-slate-500 hover:text-rose-600 font-extrabold px-2 py-0.5 rounded hover:bg-rose-50 transition-all cursor-pointer"
                             >
                               Xóa
                             </button>

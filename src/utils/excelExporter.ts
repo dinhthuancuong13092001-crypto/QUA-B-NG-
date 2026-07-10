@@ -137,7 +137,7 @@ export function exportTournamentToExcel(
   // ==================== SHEET 2: LỊCH THI ĐẤU & KẾT QUẢ ====================
   xml += `
   <Worksheet ss:Name="Lịch thi đấu &amp; Kết quả">
-    <Table ss:ExpandedColumnCount="11" ss:DefaultRowHeight="20">
+    <Table ss:ExpandedColumnCount="13" ss:DefaultRowHeight="20">
       <Column ss:Width="80"/>
       <Column ss:Width="80"/>
       <Column ss:Width="160"/>
@@ -147,11 +147,13 @@ export function exportTournamentToExcel(
       <Column ss:Width="160"/>
       <Column ss:Width="120"/>
       <Column ss:Width="120"/>
-      <Column ss:Width="60"/>
-      <Column ss:Width="60"/>
+      <Column ss:Width="120"/>
+      <Column ss:Width="80"/>
+      <Column ss:Width="80"/>
+      <Column ss:Width="180"/>
       
       <Row ss:Height="30">
-        <Cell ss:MergeAcross="10" ss:StyleID="TitleStyle">
+        <Cell ss:MergeAcross="12" ss:StyleID="TitleStyle">
           <Data ss:Type="String">LỊCH THI ĐẤU VÀ KẾT QUẢ CÁC TRẬN ĐẤU</Data>
         </Cell>
       </Row>
@@ -165,9 +167,11 @@ export function exportTournamentToExcel(
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Tỷ số</Data></Cell>
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Đội khách</Data></Cell>
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Thời gian</Data></Cell>
+        <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Địa điểm</Data></Cell>
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Trọng tài</Data></Cell>
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Thẻ phạt nhà</Data></Cell>
         <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Thẻ phạt khách</Data></Cell>
+        <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Ghi chú thẻ đỏ</Data></Cell>
       </Row>
   `;
 
@@ -182,6 +186,7 @@ export function exportTournamentToExcel(
       ? "Nghỉ vòng này" 
       : `${match.date || ""} ${match.time || ""}`.trim() || "Chưa xếp lịch";
       
+    const locationStr = match.isBye ? "-" : match.location || "Chưa xếp địa điểm";
     const refereeStr = match.referee || "Chưa phân công";
     const groupStr = match.group || "Knock-out";
 
@@ -191,6 +196,10 @@ export function exportTournamentToExcel(
       : "-";
     const awayCardsText = match.played && !match.isBye 
       ? `V: ${match.awayYellowCards} | Đ: ${match.awayRedCards}` 
+      : "-";
+
+    const redCardNotesStr = (match.homeRedCardNotes || match.awayRedCardNotes)
+      ? `${match.homeRedCardNotes ? `Nhà: ${match.homeRedCardNotes} ` : ""}${match.awayRedCardNotes ? `| Khách: ${match.awayRedCardNotes}` : ""}`
       : "-";
 
     xml += `
@@ -203,9 +212,11 @@ export function exportTournamentToExcel(
         <Cell ss:StyleID="DataCenter"><Data ss:Type="String">${playedTextAway}</Data></Cell>
         <Cell ss:StyleID="DataLeft"><Data ss:Type="String">${awayName}</Data></Cell>
         <Cell ss:StyleID="DataCenter"><Data ss:Type="String">${dateTimeStr}</Data></Cell>
+        <Cell ss:StyleID="DataLeft"><Data ss:Type="String">${locationStr}</Data></Cell>
         <Cell ss:StyleID="DataLeft"><Data ss:Type="String">${refereeStr}</Data></Cell>
         <Cell ss:StyleID="DataCenter"><Data ss:Type="String">${homeCardsText}</Data></Cell>
         <Cell ss:StyleID="DataCenter"><Data ss:Type="String">${awayCardsText}</Data></Cell>
+        <Cell ss:StyleID="DataLeft"><Data ss:Type="String">${redCardNotesStr}</Data></Cell>
       </Row>
     `;
   });

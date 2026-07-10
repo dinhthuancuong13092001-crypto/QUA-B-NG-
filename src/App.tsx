@@ -332,50 +332,50 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f0f2f5] flex flex-col font-sans select-none text-slate-900">
-      {/* HEADER CỦA TOÀN BỘ ỨNG DỤNG - High Density Dark Theme */}
-      <header className="flex flex-col md:flex-row items-center justify-between px-6 py-3 bg-[#1e293b] text-white shadow-md sticky top-0 z-30">
+    <div className="min-h-screen bg-[#f4f7fc] flex flex-col font-sans select-none text-slate-800">
+      {/* HEADER CỦA TOÀN BỘ ỨNG DỤNG - Modern Premium White-Blue (Trắng Xanh) Theme */}
+      <header className="flex flex-col md:flex-row items-center justify-between px-6 py-3.5 bg-gradient-to-r from-blue-700 via-blue-600 to-cyan-600 text-white shadow-lg sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-blue-500 rounded text-white flex items-center justify-center">
-            <Trophy className="w-5 h-5 text-white" />
+          <div className="p-2.5 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 text-white flex items-center justify-center shadow-inner">
+            <Trophy className="w-5.5 h-5.5 text-yellow-300" />
           </div>
           <div className="space-y-0.5">
-            <h1 className="text-md font-bold tracking-tight flex items-center gap-2">
+            <h1 className="text-md font-extrabold tracking-tight flex items-center gap-2">
               Quản lý Giải đấu Bóng đá Pro
-              <span className="text-[10px] bg-slate-800 border border-slate-700 text-sky-400 px-2 py-0.5 rounded font-semibold">
+              <span className="text-[10px] bg-white/20 border border-white/30 text-white px-2 py-0.5 rounded-full font-bold">
                 v2.5
               </span>
             </h1>
-            <p className="text-[10px] text-slate-300 opacity-80 font-medium">
+            <p className="text-[10px] text-blue-100 font-semibold tracking-wide uppercase">
               Sắp lịch thi đấu thông minh &amp; Sắp xếp bảng thứ bậc chuẩn FIFA
             </p>
           </div>
         </div>
 
         {/* BỘ LỌC CHỌN GIẢI ĐẤU NHANH TRÊN HEADER */}
-        <div className="flex items-center gap-2 mt-3 md:mt-0 bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700/80">
-          <span className="text-[9px] font-bold text-slate-300 uppercase tracking-wider font-mono">Giải đấu:</span>
+        <div className="flex items-center gap-2 mt-3 md:mt-0 bg-white/10 backdrop-blur-md px-3.5 py-1.5 rounded-lg border border-white/20 shadow-xs">
+          <span className="text-[9px] font-bold text-blue-100 uppercase tracking-wider font-mono">Giải đấu:</span>
           <select
             value={activeTournamentId}
             onChange={(e) => handleSwitchTournament(e.target.value)}
             className="bg-transparent text-white font-bold text-xs focus:outline-none cursor-pointer max-w-[150px] sm:max-w-[200px] truncate pr-1"
           >
             {tournaments.map((t) => (
-              <option key={t.id} value={t.id} className="bg-[#1e293b] text-white font-semibold text-xs">
+              <option key={t.id} value={t.id} className="bg-blue-800 text-white font-semibold text-xs">
                 {t.name}
               </option>
             ))}
           </select>
           <button
             onClick={() => setIsManagerOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-2 py-1 rounded text-[10px] transition-all cursor-pointer flex items-center gap-1 shadow-xs"
+            className="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold px-3 py-1 rounded-md text-[10px] transition-all cursor-pointer flex items-center gap-1 shadow-md hover:scale-102 active:scale-98"
             title="Quản lý giải đấu (Thêm / Sửa / Xóa / Sao lưu)"
           >
             <Settings className="w-3 h-3 animate-spin-slow" />
             <span>Thêm/Xóa giải</span>
           </button>
           
-          <label className="flex items-center gap-1 cursor-pointer pl-2 border-l border-slate-700 select-none">
+          <label className="flex items-center gap-1.5 cursor-pointer pl-2.5 border-l border-white/20 select-none">
             <input
               type="checkbox"
               checked={isAutoSaveEnabled}
@@ -388,9 +388,9 @@ export default function App() {
                   "info"
                 );
               }}
-              className="accent-blue-500 rounded text-blue-600 h-3.5 w-3.5 focus:ring-0 cursor-pointer"
+              className="accent-emerald-400 rounded text-emerald-500 h-3.5 w-3.5 focus:ring-0 cursor-pointer"
             />
-            <span className="text-[10px] font-bold text-slate-300 font-mono tracking-tight hover:text-white transition-colors" title="Mặc định tự lưu và tải file backup JSON khi thay đổi">
+            <span className="text-[10px] font-bold text-blue-50 hover:text-white transition-colors" title="Mặc định tự lưu và tải file backup JSON khi thay đổi">
               Tự lưu JSON
             </span>
           </label>
@@ -399,65 +399,65 @@ export default function App() {
         {/* THÔNG TIN TRẠNG THÁI GIẢI ĐẤU (High Density Stats Indicator) */}
         <div className="flex gap-4 text-xs mt-3 md:mt-0">
           <div className="flex flex-col items-end">
-            <span className="opacity-60 uppercase font-bold text-[9px] tracking-wider">Thể thức giải</span>
-            <span className="font-semibold text-slate-100">
-              {tournamentType === TournamentType.ROUND_ROBIN ? "Chia bảng đấu vòng tròn" : "Đấu loại trực tiếp"}
+            <span className="text-blue-200 uppercase font-extrabold text-[9px] tracking-wider">Thể thức giải</span>
+            <span className="font-bold text-white text-right">
+              {tournamentType === TournamentType.ROUND_ROBIN ? "Vòng tròn tính điểm" : "Đấu loại trực tiếp"}
             </span>
           </div>
           <div className="w-px bg-white/20"></div>
           <div className="flex flex-col items-end">
-            <span className="opacity-60 uppercase font-bold text-[9px] tracking-wider">Trạng thái</span>
-            <span className={`font-semibold ${matches.length > 0 ? (matches.filter(m => m.played).length === matches.length ? "text-amber-400" : "text-emerald-400") : "text-slate-400"}`}>
+            <span className="text-blue-200 uppercase font-extrabold text-[9px] tracking-wider">Trạng thái</span>
+            <span className={`font-bold text-right ${matches.length > 0 ? (matches.filter(m => m.played).length === matches.length ? "text-amber-300" : "text-emerald-300") : "text-blue-200"}`}>
               {matches.length > 0 ? (matches.filter(m => m.played).length === matches.length ? "Đã kết thúc" : "Đang diễn ra") : "Chưa bắt đầu"}
             </span>
           </div>
         </div>
       </header>
 
-      {/* PYQT6 STYLE TAB BAR */}
-      <nav className="flex bg-white border-b border-slate-300 px-4 sticky top-[56px] z-20 shadow-2xs">
+      {/* MODERN TRẮNG-XANH TAB BAR */}
+      <nav className="flex bg-white border-b border-blue-100 px-6 sticky top-[57px] z-20 shadow-sm">
         <button
           onClick={() => setActiveTab("teams")}
-          className={`px-5 py-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-5 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeTab === "teams"
-              ? "border-blue-600 text-blue-600 font-bold bg-slate-50/50"
-              : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              ? "border-blue-600 text-blue-600 font-extrabold bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-blue-50/20"
           }`}
         >
-          <Users className="w-3.5 h-3.5" />
+          <Users className="w-4 h-4" />
           Quản lý Đội bóng
         </button>
         <button
           onClick={() => setActiveTab("matches")}
-          className={`px-5 py-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-5 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeTab === "matches"
-              ? "border-blue-600 text-blue-600 font-bold bg-slate-50/50"
-              : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              ? "border-blue-600 text-blue-600 font-extrabold bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-blue-50/20"
           }`}
         >
-          <Calendar className="w-3.5 h-3.5" />
+          <Calendar className="w-4 h-4" />
           Lịch thi đấu &amp; Kết quả
         </button>
         <button
           onClick={() => setActiveTab("standings")}
-          className={`px-5 py-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-5 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeTab === "standings"
-              ? "border-blue-600 text-blue-600 font-bold bg-slate-50/50"
-              : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              ? "border-blue-600 text-blue-600 font-extrabold bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-blue-50/20"
           }`}
         >
-          <Trophy className="w-3.5 h-3.5" />
+          <Trophy className="w-4 h-4" />
           Bảng xếp hạng
         </button>
         <button
           onClick={() => setActiveTab("python")}
-          className={`px-5 py-3 text-xs font-semibold border-b-2 transition-colors cursor-pointer flex items-center gap-1.5 ${
+          className={`px-5 py-3.5 text-xs font-bold border-b-2 transition-all cursor-pointer flex items-center gap-2 ${
             activeTab === "python"
-              ? "border-blue-600 text-blue-600 font-bold bg-slate-50/50"
-              : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              ? "border-blue-600 text-blue-600 font-extrabold bg-blue-50/50"
+              : "border-transparent text-slate-500 hover:text-blue-600 hover:bg-blue-50/20"
           }`}
         >
-          <Terminal className="w-3.5 h-3.5" />
+          <Terminal className="w-4 h-4" />
           Xuất bản dữ liệu &amp; Python Code
         </button>
       </nav>
@@ -504,19 +504,19 @@ export default function App() {
       </main>
 
       {/* FOOTER BAR (PyQt6 Styled System Status) */}
-      <footer className="bg-slate-200 border-t border-slate-300 px-6 py-2.5 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-600 font-mono">
+      <footer className="bg-white border-t border-blue-100 px-6 py-3 flex flex-col sm:flex-row justify-between items-center text-[10px] text-slate-500 font-mono shadow-inner">
         <div className="flex flex-wrap items-center gap-4">
-          <span className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 
-            Sẵn sàng
+          <span className="flex items-center gap-1 text-emerald-600 font-bold">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> 
+            Hệ thống sẵn sàng
           </span>
-          <span className="text-slate-400">|</span>
-          <span>Hệ thống: React + Tailwind CSS High Density Theme</span>
-          <span className="text-slate-400">|</span>
-          <span>Bộ nhớ đệm: Đa giải đấu cục bộ (Indexed LocalStorage Active)</span>
+          <span className="text-blue-100">|</span>
+          <span>Hệ thống: React + Tailwind CSS (Trắng Xanh Theme)</span>
+          <span className="text-blue-100">|</span>
+          <span>Bộ nhớ đệm: Trực quan hóa dữ liệu thời gian thực</span>
         </div>
-        <div className="mt-1 sm:mt-0 text-right">
-          Hỗ trợ kỹ thuật: support@footyapp.vn | Phiên bản PyQt6 Desktop Ready
+        <div className="mt-1 sm:mt-0 text-slate-400 font-medium">
+          Hỗ trợ kỹ thuật: support@footyapp.vn | Trực quan &amp; Chuyên nghiệp
         </div>
       </footer>
 

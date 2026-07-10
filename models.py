@@ -22,10 +22,13 @@ class Match:
     date_str: str = ""       # Ngày thi đấu
     time_str: str = ""       # Giờ thi đấu
     referee: str = ""        # Trọng tài bắt chính
+    location: str = ""       # Địa điểm thi đấu / Vị trí trận đấu
     home_yellow_cards: int = 0
     home_red_cards: int = 0
+    home_red_card_notes: str = "" # Ghi chú thẻ đỏ đội nhà
     away_yellow_cards: int = 0
     away_red_cards: int = 0
+    away_red_card_notes: str = "" # Ghi chú thẻ đỏ đội khách
     is_bye: bool = False     # Trận đấu với đội Nghỉ (BYE)
 
 @dataclass

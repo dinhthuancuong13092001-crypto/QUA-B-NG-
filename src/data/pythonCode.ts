@@ -37,10 +37,13 @@ class Match:
     date_str: str = ""       # Ngày thi đấu
     time_str: str = ""       # Giờ thi đấu
     referee: str = ""        # Trọng tài bắt chính
+    location: str = ""       # Địa điểm thi đấu / Vị trí trận đấu
     home_yellow_cards: int = 0
     home_red_cards: int = 0
+    home_red_card_notes: str = "" # Ghi chú thẻ đỏ đội nhà
     away_yellow_cards: int = 0
     away_red_cards: int = 0
+    away_red_card_notes: str = "" # Ghi chú thẻ đỏ đội khách
     is_bye: bool = False     # Trận đấu với đội Nghỉ (BYE)
 
 @dataclass
@@ -509,7 +512,8 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, 
     QSpinBox, QInputDialog, QMessageBox, QDialog, QFormLayout, 
-    QLineEdit, QDateTimeEdit, QSplitter, QGroupBox, QListWidget, QCheckBox, QTabWidget
+    QLineEdit, QDateTimeEdit, QSplitter, QGroupBox, QListWidget, QCheckBox, QTabWidget,
+    QScrollArea
 )
 from PyQt6.QtCore import Qt, QDateTime
 from models import Team, Match, TeamStanding, Tournament
@@ -943,8 +947,10 @@ class TeamTab(QWidget):
 
     def update_team_table(self):
         teams = self.main_window.teams
-        self.table_teams.setRowCount(len(teams))
-        for r_idx, team in enumerate(teams):
+        # Sắp xếp các đội theo Bảng đấu trước, sau đó theo Tên đội để các đội cùng bảng hiển thị gần nhau
+        sorted_teams = sorted(teams, key=lambda x: (x.group or "Z_UNASSIGNED", x.name))
+        self.table_teams.setRowCount(len(sorted_teams))
+        for r_idx, team in enumerate(sorted_teams):
             self.table_teams.setItem(r_idx, 0, QTableWidgetItem(team.id))
             self.table_teams.setItem(r_idx, 1, QTableWidgetItem(team.name))
             self.table_teams.setItem(r_idx, 2, QTableWidgetItem(team.group or "Chưa phân"))
@@ -1092,6 +1098,10 @@ class MatchEditDialog(QDialog):
         self.spin_home_red.setValue(self.match.home_red_cards)
         form.addRow("Thẻ đỏ Đội Nhà:", self.spin_home_red)
 
+        self.txt_home_red_notes = QLineEdit(self.match.home_red_card_notes)
+        self.txt_home_red_notes.setPlaceholderText("Ghi chú lý do thẻ đỏ đội nhà...")
+        form.addRow("Ghi chú Thẻ đỏ Đội Nhà:", self.txt_home_red_notes)
+
         self.spin_away_yellow = QSpinBox()
         self.spin_away_yellow.setRange(0, 20)
         self.spin_away_yellow.setValue(self.match.away_yellow_cards)
@@ -1102,9 +1112,18 @@ class MatchEditDialog(QDialog):
         self.spin_away_red.setValue(self.match.away_red_cards)
         form.addRow("Thẻ đỏ Đội Khách:", self.spin_away_red)
 
+        self.txt_away_red_notes = QLineEdit(self.match.away_red_card_notes)
+        self.txt_away_red_notes.setPlaceholderText("Ghi chú lý do thẻ đỏ đội khách...")
+        form.addRow("Ghi chú Thẻ đỏ Đội Khách:", self.txt_away_red_notes)
+
+        # ...
         # Thông tin phụ
         self.txt_referee = QLineEdit(self.match.referee)
         form.addRow("Trọng tài chính:", self.txt_referee)
+
+        self.txt_location = QLineEdit(self.match.location)
+        self.txt_location.setPlaceholderText("Sân vận động, sân bóng...")
+        form.addRow("Địa điểm thi đấu (Vị trí):", self.txt_location)
 
         self.edit_date = QLineEdit(self.match.date_str or datetime.date.today().strftime("%Y-%m-%d"))
         form.addRow("Ngày thi đấu (YYYY-MM-DD):", self.edit_date)
@@ -1133,9 +1152,12 @@ class MatchEditDialog(QDialog):
         self.match.away_score = self.spin_away.value()
         self.match.home_yellow_cards = self.spin_home_yellow.value()
         self.match.home_red_cards = self.spin_home_red.value()
+        self.match.home_red_card_notes = self.txt_home_red_notes.text().strip()
         self.match.away_yellow_cards = self.spin_away_yellow.value()
         self.match.away_red_cards = self.spin_away_red.value()
+        self.match.away_red_card_notes = self.txt_away_red_notes.text().strip()
         self.match.referee = self.txt_referee.text().strip()
+        self.match.location = self.txt_location.text().strip()
         self.match.date_str = self.edit_date.text().strip()
         self.match.time_str = self.edit_time.text().strip()
         self.match.played = True
@@ -1159,6 +1181,13 @@ class MatchTab(QWidget):
         self.combo_round_filter.addItem("Tất cả các vòng")
         self.combo_round_filter.currentIndexChanged.connect(self.refresh_matches)
         filter_layout.addWidget(self.combo_round_filter)
+
+        filter_layout.addWidget(QLabel("Bảng đấu:"))
+        self.combo_group_filter = QComboBox()
+        self.combo_group_filter.addItem("Tất cả các bảng")
+        self.combo_group_filter.currentIndexChanged.connect(self.refresh_matches)
+        filter_layout.addWidget(self.combo_group_filter)
+        
         filter_layout.addStretch()
         
         self.btn_update_match = QPushButton("✏ Nhập kết quả Trận đấu")
@@ -1202,7 +1231,8 @@ class MatchTab(QWidget):
         matches = self.main_window.matches
         teams = self.main_window.teams
         
-        current_idx = self.combo_round_filter.currentIndex()
+        # Đồng bộ bộ lọc vòng đấu
+        current_idx_r = self.combo_round_filter.currentIndex()
         self.combo_round_filter.blockSignals(True)
         self.combo_round_filter.clear()
         self.combo_round_filter.addItem("Tất cả các vòng")
@@ -1211,14 +1241,34 @@ class MatchTab(QWidget):
         for r in range(1, max_round + 1):
             self.combo_round_filter.addItem(f"Vòng {r}")
         
-        if current_idx < self.combo_round_filter.count() and current_idx > 0:
-            self.combo_round_filter.setCurrentIndex(current_idx)
+        if current_idx_r < self.combo_round_filter.count() and current_idx_r > 0:
+            self.combo_round_filter.setCurrentIndex(current_idx_r)
         self.combo_round_filter.blockSignals(False)
 
+        # Đồng bộ bộ lọc bảng đấu
+        current_idx_g = self.combo_group_filter.currentIndex()
+        self.combo_group_filter.blockSignals(True)
+        self.combo_group_filter.clear()
+        self.combo_group_filter.addItem("Tất cả các bảng")
+        
+        available_groups = sorted(list(set([m.group for m in matches if m.group])))
+        for g in available_groups:
+            self.combo_group_filter.addItem(f"Bảng {g}")
+            
+        if current_idx_g < self.combo_group_filter.count() and current_idx_g > 0:
+            self.combo_group_filter.setCurrentIndex(current_idx_g)
+        self.combo_group_filter.blockSignals(False)
+
         selected_round = self.combo_round_filter.currentIndex()
+        selected_group_idx = self.combo_group_filter.currentIndex()
+
         filtered_matches = matches
         if selected_round > 0:
-            filtered_matches = [m for m in matches if m.round_num == selected_round]
+            filtered_matches = [m for m in filtered_matches if m.round_num == selected_round]
+            
+        if selected_group_idx > 0:
+            sel_g = self.combo_group_filter.itemText(selected_group_idx).replace("Bảng ", "")
+            filtered_matches = [m for m in filtered_matches if m.group == sel_g]
 
         self.table_matches.setRowCount(len(filtered_matches))
         for r_idx, m in enumerate(filtered_matches):
@@ -1299,9 +1349,12 @@ class MatchTab(QWidget):
             away_score=match.away_score,
             home_yellow_cards=match.home_yellow_cards,
             home_red_cards=match.home_red_cards,
+            home_red_card_notes=match.home_red_card_notes,
             away_yellow_cards=match.away_yellow_cards,
             away_red_cards=match.away_red_cards,
+            away_red_card_notes=match.away_red_card_notes,
             referee=match.referee,
+            location=match.location,
             date_str=match.date_str,
             time_str=match.time_str,
             played=match.played
@@ -1313,9 +1366,12 @@ class MatchTab(QWidget):
             match.away_score = display_match.away_score
             match.home_yellow_cards = display_match.home_yellow_cards
             match.home_red_cards = display_match.home_red_cards
+            match.home_red_card_notes = display_match.home_red_card_notes
             match.away_yellow_cards = display_match.away_yellow_cards
             match.away_red_cards = display_match.away_red_cards
+            match.away_red_card_notes = display_match.away_red_card_notes
             match.referee = display_match.referee
+            match.location = display_match.location
             match.date_str = display_match.date_str
             match.time_str = display_match.time_str
             match.played = True
@@ -1376,14 +1432,17 @@ class StandingsTab(QWidget):
         
         layout.addLayout(filter_layout)
 
-        self.table_standings = QTableWidget()
-        self.table_standings.setColumnCount(12)
-        self.table_standings.setHorizontalHeaderLabels([
-            "Hạng", "Đội bóng", "Trận", "Thắng", "Hòa", "Thua", "Bàn thắng (BT)", "Bàn thua (BP)", "Hiệu số (HS)", "Thẻ V/Đ", "Điểm kỷ luật", "Điểm số"
-        ])
-        self.table_standings.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        layout.addWidget(self.table_standings)
+        # Sử dụng QScrollArea để chứa các bảng xếp hạng (hỗ trợ hiển thị nhiều bảng đấu cùng một lúc)
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
         
+        self.container_widget = QWidget()
+        self.container_layout = QVBoxLayout(self.container_widget)
+        self.container_layout.setContentsMargins(0, 0, 0, 0)
+        self.scroll_area.setWidget(self.container_widget)
+        
+        layout.addWidget(self.scroll_area)
         self.setLayout(layout)
 
     def calculate_standings_list(self, teams, matches, filter_group=None) -> list:
@@ -1452,6 +1511,46 @@ class StandingsTab(QWidget):
         standings_list.sort(key=get_sort_key, reverse=True)
         return standings_list
 
+    def create_standing_table(self, standings):
+        table = QTableWidget()
+        table.setColumnCount(12)
+        table.setHorizontalHeaderLabels([
+            "Hạng", "Đội bóng", "Trận", "Thắng", "Hòa", "Thua", "Bàn thắng (BT)", "Bàn thua (BP)", "Hiệu số (HS)", "Thẻ V/Đ", "Điểm kỷ luật", "Điểm số"
+        ])
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.setRowCount(len(standings))
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        
+        for r_idx, std in enumerate(standings):
+            table.setItem(r_idx, 0, QTableWidgetItem(str(r_idx + 1)))
+            table.setItem(r_idx, 1, QTableWidgetItem(std.team_name))
+            table.setItem(r_idx, 2, QTableWidgetItem(str(std.played)))
+            table.setItem(r_idx, 3, QTableWidgetItem(str(std.won)))
+            table.setItem(r_idx, 4, QTableWidgetItem(str(std.drawn)))
+            table.setItem(r_idx, 5, QTableWidgetItem(str(std.lost)))
+            table.setItem(r_idx, 6, QTableWidgetItem(str(std.goals_for)))
+            table.setItem(r_idx, 7, QTableWidgetItem(str(std.goals_against)))
+            table.setItem(r_idx, 8, QTableWidgetItem(str(std.goal_difference)))
+            
+            cards_str = f"V:{std.yellow_cards} | Đ:{std.red_cards}"
+            table.setItem(r_idx, 9, QTableWidgetItem(cards_str))
+            table.setItem(r_idx, 10, QTableWidgetItem(str(std.discipline_points)))
+            
+            pt_item = QTableWidgetItem(str(std.points))
+            pt_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            table.setItem(r_idx, 11, pt_item)
+            
+            # Căn giữa văn bản để giao diện đẹp, chuyên nghiệp hơn
+            for c_idx in range(12):
+                item = table.item(r_idx, c_idx)
+                if item and c_idx != 1:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    
+        # Thiết lập chiều cao cố định cho bảng dựa vào số hàng để không bị thanh cuộn bên trong bảng
+        table.setFixedHeight(35 + len(standings) * 28)
+        return table
+
     def refresh_standings(self):
         teams = self.main_window.teams
         matches = self.main_window.matches
@@ -1469,31 +1568,51 @@ class StandingsTab(QWidget):
             self.combo_group_filter.setCurrentIndex(current_idx)
         self.combo_group_filter.blockSignals(False)
 
+        # Xóa toàn bộ widget cũ trong container_layout
+        while self.container_layout.count():
+            item = self.container_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
         selected_grp = None
         if self.combo_group_filter.currentIndex() > 0:
             selected_grp = self.combo_group_filter.currentText().replace("Bảng ", "")
 
-        standings = self.calculate_standings_list(teams, matches, selected_grp)
+        t = self.main_window.get_active_tournament()
+        is_rr = t.type == "ROUND_ROBIN"
 
-        self.table_standings.setRowCount(len(standings))
-        for r_idx, std in enumerate(standings):
-            self.table_standings.setItem(r_idx, 0, QTableWidgetItem(str(r_idx + 1)))
-            self.table_standings.setItem(r_idx, 1, QTableWidgetItem(std.team_name))
-            self.table_standings.setItem(r_idx, 2, QTableWidgetItem(str(std.played)))
-            self.table_standings.setItem(r_idx, 3, QTableWidgetItem(str(std.won)))
-            self.table_standings.setItem(r_idx, 4, QTableWidgetItem(str(std.drawn)))
-            self.table_standings.setItem(r_idx, 5, QTableWidgetItem(str(std.lost)))
-            self.table_standings.setItem(r_idx, 6, QTableWidgetItem(str(std.goals_for)))
-            self.table_standings.setItem(r_idx, 7, QTableWidgetItem(str(std.goals_against)))
-            self.table_standings.setItem(r_idx, 8, QTableWidgetItem(str(std.goal_difference)))
+        if selected_grp:
+            # Hiển thị riêng một bảng đấu
+            title_lbl = QLabel(f"<b>BẢNG XẾP HẠNG - BẢNG {selected_grp}</b>")
+            title_lbl.setStyleSheet("font-size: 14px; color: #1B365D; font-weight: bold; margin-top: 5px; margin-bottom: 5px;")
+            self.container_layout.addWidget(title_lbl)
             
-            cards_str = f"V:{std.yellow_cards} | Đ:{std.red_cards}"
-            self.table_standings.setItem(r_idx, 9, QTableWidgetItem(cards_str))
-            self.table_standings.setItem(r_idx, 10, QTableWidgetItem(str(std.discipline_points)))
-            
-            pt_item = QTableWidgetItem(str(std.points))
-            pt_item.setFont(Qt.ItemFlag.ItemIsEnabled)
-            self.table_standings.setItem(r_idx, 11, pt_item)
+            standings = self.calculate_standings_list(teams, matches, selected_grp)
+            table = self.create_standing_table(standings)
+            self.container_layout.addWidget(table)
+            self.container_layout.addStretch()
+        else:
+            # "Toàn giải" - Nếu có nhiều bảng, hiển thị từng bảng đấu cùng với nhau
+            if is_rr and len(groups_list) > 1:
+                for g in groups_list:
+                    title_lbl = QLabel(f"<b>BẢNG XẾP HẠNG - BẢNG {g}</b>")
+                    title_lbl.setStyleSheet("font-size: 14px; color: #1B365D; font-weight: bold; margin-top: 10px; margin-bottom: 5px;")
+                    self.container_layout.addWidget(title_lbl)
+                    
+                    standings = self.calculate_standings_list(teams, matches, g)
+                    table = self.create_standing_table(standings)
+                    self.container_layout.addWidget(table)
+                self.container_layout.addStretch()
+            else:
+                title_lbl = QLabel("<b>BẢNG XẾP HẠNG TOÀN GIẢI</b>")
+                title_lbl.setStyleSheet("font-size: 14px; color: #1B365D; font-weight: bold; margin-top: 5px; margin-bottom: 5px;")
+                self.container_layout.addWidget(title_lbl)
+                
+                standings = self.calculate_standings_list(teams, matches, None)
+                table = self.create_standing_table(standings)
+                self.container_layout.addWidget(table)
+                self.container_layout.addStretch()
 
 
 class ExportTab(QWidget):
